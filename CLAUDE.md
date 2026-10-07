@@ -198,7 +198,11 @@ Toda nueva funcionalidad o corrección sigue estos pasos, en este orden:
    - `CHANGELOG.md`: entrada con fecha.
    - Este fichero: §6 (estado), §7 (hoja de ruta) y §8 si procede de una asignatura.
    - `README.md` si cambia lo que la calculadora calcula.
-7. **Compilar**: web (`web/`, copiar el HTML a `index.html`) y, si se pide, el `.exe`.
+7. **Compilar, siempre las dos** (petición de Antonio, sin esperar a que lo pida): web
+   (`node build.mjs` en `web/` y copiar el HTML a `index.html`, en el mismo commit) y el `.exe`
+   (`python -m PyInstaller --noconfirm --clean calculadora.spec` en `python/`; `build_exe.bat`
+   hace lo mismo pero se queda en `pause`). Mover `dist/CalculadoraSupervivencia.exe` a
+   `ejecutables/` y borrar `build/` y `dist/`.
 8. **Commit** con mensaje descriptivo. **Push solo cuando Antonio lo pida.**
 
 ## 7\. Hoja de ruta
