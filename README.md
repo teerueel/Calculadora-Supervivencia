@@ -16,12 +16,13 @@ Financieras. Dos implementaciones equivalentes: una aplicación web y una de esc
 | ₙqₓ | probabilidad de que (x) fallezca dentro de los próximos n años |
 | ₘ\|ₙqₓ | probabilidad de que (x) fallezca entre las edades x+m y x+m+n |
 | eₓ, e̊ₓ | esperanza de vida abreviada y completa |
+| ₖ\|ä⁽ᵐ⁾ₓ:ₙ⌉, ₖ\|a⁽ᵐ⁾ₓ:ₙ⌉ | distribución, momentos de orden s y métricas de una renta actuarial |
 
 La edad x, el plazo n y el diferimiento m admiten decimales. Las edades no enteras se
 resuelven repartiendo dentro del año la qₓ publicada, con interpolación lineal (UDD) o
 exponencial (fuerza de mortalidad constante), seleccionable.
 
-## Las cuatro pestañas
+## Las cinco pestañas
 
 1. **Tablas de mortalidad** — nueve tablas: PER2020 Individual y Colectiva (generacionales,
    con factor de mejora sobre la cohorte) y PASEM2020 General, Rel, NoRel y Decesos
@@ -31,9 +32,14 @@ exponencial (fuerza de mortalidad constante), seleccionable.
    tabla de referencia superpuesta.
 3. **Comparación** — hasta ocho escenarios mixtos, cada uno con su sexo y, si es un modelo,
    con sus propios parámetros.
-4. **Atlas** — guía de los modelos paramétricos y de las tablas e hipótesis de interpolación.
+4. **Rentas actuariales** — renta temporal o vitalicia, prepagable o postpagable, con m pagos al
+   año, cuantía por plazo c (cuantía anual C = m·c), diferimiento k e interés efectivo anual I.
+   Muestra la distribución (valores y probabilidades), los momentos E[Yˢ] de los órdenes
+   elegidos y, a partir de ellos, media (prima pura única), varianza, desviación típica,
+   coeficiente de variación, asimetría, curtosis, cuantiles, VaR y TVaR al 99,5 %.
+5. **Atlas** — guía de los modelos paramétricos y de las tablas e hipótesis de interpolación.
 
-En todas, tres gráficas: supervivencia ₜpₓ, distribución ₜqₓ y tanto instantáneo μₓ₊ₜ.
+En las tres primeras, tres gráficas: supervivencia ₜpₓ, distribución ₜqₓ y tanto instantáneo μₓ₊ₜ.
 
 ## Principio de cálculo
 
@@ -50,6 +56,19 @@ esquema con lₓ = 100.000 · S(x), donde S(x) = e^(−∫μ).
 
 Identidad de control, que las dos implementaciones verifican: ₘqₓ + ₘ|ₙqₓ + ₘ₊ₙpₓ = 1.
 
+### Rentas actuariales
+
+Con v = (1+I)⁻¹, N = m·n plazos y n = w + 1 − x − k en la vitalicia (w = 120):
+
+| Prepagable ₖ\|ä⁽ᵐ⁾ₓ:ₙ⌉ | Postpagable ₖ\|a⁽ᵐ⁾ₓ:ₙ⌉ |
+| --- | --- |
+| 0 con prob. ₖqₓ (si k > 0) | 0 con prob. ₖ₊₁/ₘqₓ |
+| ₖ\|ä⁽ᵐ⁾_{j/m⌉} con prob. ₖ₊₍ⱼ₋₁₎/ₘ\|₁/ₘqₓ, j = 1…N | ₖ\|a⁽ᵐ⁾_{j/m⌉} con prob. ₖ₊ⱼ/ₘ\|₁/ₘqₓ, j = 1…N−1 |
+| al último valor se le suma ₖ₊ₙpₓ (temporal) | ₖ\|a⁽ᵐ⁾ₙ⌉ con prob. ₖ₊ₙpₓ (temporal) |
+
+Los momentos son E[Yˢ] = Σ valorˢ · prob. Las probabilidades se leen de lₓ; las edades x + j/m
+no enteras usan interpolación lineal (UDD). x es entera; n y k, múltiplos de 1/m.
+
 ## Estructura
 
 ```
@@ -58,8 +77,8 @@ web/      aplicación web (React + recharts) y el HTML autocontenido ya compilad
 docs/     CLAUDE.md (convenciones del proyecto) y SKILL.md (procedimiento de cálculo)
 ```
 
-El motor está separado de la interfaz: `python/datos.py`, `python/tablas.py` y
-`python/modelos.py`, con sus equivalentes en `web/src/data.js` y `web/src/engine.js`. Ambos
+El motor está separado de la interfaz: `python/datos.py`, `python/tablas.py`,
+`python/modelos.py` y `python/rentas.py`, con sus equivalentes en `web/src/data.js`, `web/src/engine.js` y `web/src/rentas.js`. Ambos
 motores dan el mismo resultado; la diferencia máxima medida es de 1,1·10⁻¹⁶.
 
 ## Ejecutar

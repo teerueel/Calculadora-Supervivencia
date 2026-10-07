@@ -177,6 +177,16 @@ table.sum{min-width:760px;}
 .sum thead th{font-size:12.5px;color:var(--muted);font-weight:600;background:var(--field);}
 .sum td.c{text-align:center;width:90px;}
 .prose p{max-width:85ch;margin:6px 0;}
+/* Rentas actuariales */
+.rs-ss{display:inline-flex;flex-direction:column;vertical-align:middle;line-height:1.02;font-size:.6em;font-style:normal;margin-left:.04em;text-align:left;}
+.rs-sub{white-space:nowrap;}
+.ang{border-top:1px solid currentColor;border-right:1px solid currentColor;padding:0 .14em 0 .08em;margin-left:.03em;}
+.rrow.rhead{grid-template-columns:auto minmax(0,1fr) auto;}
+.rsym-big{white-space:nowrap;}
+.rs-c{font-family:'STIX Two Text',Georgia,serif;font-style:normal;}
+.rtab .sym{font-family:'STIX Two Text',Georgia,serif;font-size:19px;}
+.rtab td.rdef{color:var(--muted);}
+.rtab td.rcell{padding-top:4px;padding-bottom:4px;}
 
 .foot{margin:24px 0 0;padding-top:12px;border-top:1px solid var(--rule);font-size:12px;color:var(--muted);max-width:120ch;}
 @media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important;}}
