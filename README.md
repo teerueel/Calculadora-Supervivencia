@@ -5,8 +5,9 @@ españolas PER2020 y PASEM2020 (Resolución de la DGSFP de 17 de diciembre de 20
 [BOE-A-2020-17154](https://www.boe.es/buscar/doc.php?id=BOE-A-2020-17154)) y con diez leyes
 paramétricas de mortalidad.
 
-Trabajo de la asignatura **Modelos de Supervivencia** del Máster en Ciencias Actuariales y
-Financieras. Dos implementaciones equivalentes: una aplicación web y una de escritorio.
+Herramienta actuarial de uso profesional, nacida en la asignatura **Modelos de
+Supervivencia** del Máster en Ciencias Actuariales y Financieras. Dos implementaciones
+equivalentes: una aplicación web y una de escritorio.
 
 ## Qué calcula
 
@@ -74,7 +75,9 @@ no enteras usan interpolación lineal (UDD). x es entera; n y k, múltiplos de 1
 ```
 python/   aplicación de escritorio (PySide6 + matplotlib) y generación del .exe
 web/      aplicación web (React + recharts) y el HTML autocontenido ya compilado
-docs/     CLAUDE.md (convenciones del proyecto) y SKILL.md (procedimiento de cálculo)
+docs/     SKILL.md (procedimiento de cálculo)
+CLAUDE.md convenciones técnicas, decisiones y hoja de ruta
+CHANGELOG.md  historial de cambios
 ```
 
 El motor está separado de la interfaz: `python/datos.py`, `python/tablas.py`,

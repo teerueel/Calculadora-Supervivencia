@@ -1,0 +1,176 @@
+# CLAUDE.md
+
+Convenciones técnicas, decisiones y estado de la **Calculadora de supervivencia**, una
+herramienta actuarial orientada a uso profesional. Claude debe leer este fichero antes de
+escribir código o documentación del proyecto. El espacio de trabajo completo (apuntes,
+ejecutables) se describe en el `CLAUDE.md` de la carpeta superior, fuera de este repo.
+
+> Este repositorio es **público**. No incluir apuntes, enunciados ni material de terceros.
+
+* * *
+
+## 1\. Principios
+
+- **Rigor antes que comodidad.** Cada resultado debe poder trazarse a una fuente publicada
+  o a una hipótesis declarada en la interfaz.
+- **No inventar datos.** Si una `q_x` o un parámetro no está publicado ni aportado, se dice;
+  no se rellena. Repartir **dentro del año** una `q_y` publicada (lineal o exponencial) sí
+  está permitido declarando la hipótesis; crear `q_x` nuevas, no.
+- **Declarar supuestos**: tabla y orden, año de cálculo, hipótesis de fraccionamiento,
+  tipo de interés.
+- **Notación actuarial** en interfaz y documentación: subíndices reales (`_n p_x`,
+  `_{m\mid n} q_x`), nunca `nPx` ni `n_p_x`. En la web, mediante `<Sym pre base post />` y
+  `<L a={...} />`; cualquier símbolo nuevo pasa por ellos.
+- Idioma **es\-ES**, coma decimal.
+
+## 2\. Convenciones de cálculo (obligatorias)
+
+1. **Todo se calcula a partir de `l_x`.** Nada de productorios ni sumatorios acumulados:
+   se construye una vez el vector `l` y se leen posiciones.
+
+   ```math
+   l_0 = 100\,000,\qquad l_{y+1} = l_y\,(1-q_y),\qquad \omega = 121 \ (q_{120}=1,\ l_{121}=0)
+   ```
+
+2. **Fórmulas cerradas sobre `l`\:**
+
+   ```math
+   _n p_x = \frac{l_{x+n}}{l_x},\qquad
+     _n q_x = 1 - {}_n p_x,\qquad
+     _{m\mid n} q_x = \frac{l_{x+m}-l_{x+m+n}}{l_x}
+   ```
+
+   ```math
+   \mathring{e}_x \approx e_x + \tfrac12,\qquad e_x = \sum_{k\ge 1} \frac{l_{x+k}}{l_x}
+   ```
+
+   `\mathring e_x` se obtiene integrando `l` tramo a tramo con la hipótesis de interpolación
+   activa.
+
+3. **Edades no enteras** (interpolación seleccionable):
+
+   ```math
+   \text{lineal (UDD): } {}_s p_y = 1 - s\,q_y \quad (l_{y+s} = l_y - s\,d_y) \qquad
+   \text{exponencial: } {}_s p_y = p_y^{\,s} \quad (l_{y+s} = l_y\,p_y^{\,s})
+   ```
+
+4. **Tablas generacionales (PER2020).** Diagonal de la cohorte `C = \text{año} - x`, con
+   factor de mejora sobre la `q` base de 2012:
+
+   ```math
+   q_{y,\,C+y} = q_{y,\,2012}\cdot e^{-\lambda_y\,(C+y-2012)}
+   ```
+
+5. **Tablas estáticas (PASEM2020).** Año central base 2019; `q` tal cual, sin mejora.
+6. Las `q_x` publicadas están **en tanto por mil**: dividir entre 1000 y acotar a `[0,1]`.
+7. **Modelos continuos:** `l_x = 100\,000\cdot S(x)`, `S(x) = e^{-H(x)}`.
+   Heligman–Pollard da `q_x` enteras y se trata como una tabla.
+
+**Identidad de control:** `_m q_x + {}_{m\mid n} q_x + {}_{m+n} p_x = 1`.
+
+### 2\.1 Rentas actuariales
+
+Con `v = (1+I)^{-1}`, `N = m\cdot n` plazos y, en la vitalicia, `n = w + 1 - x - k`
+(`w = 120`). La renta se trata como variable aleatoria: se construye su distribución
+(valores y probabilidades leídas de `l_x`) y de ella salen los momentos
+`E[Y^s] = \sum \text{valor}^s\cdot\text{prob}`, la prima pura única, varianza, desviación,
+CV, asimetría, curtosis, cuantiles, VaR y TVaR al 99,5 %. `x` entera; `n` y `k`, múltiplos
+de `1/m`; las edades `x + j/m` usan UDD. El detalle de valores y probabilidades de la
+prepagable y la postpagable está en el `README.md`.
+
+## 3\. Fuentes de datos
+
+Resolución de la DGSFP de 17 de diciembre de 2020, **BOE\-A\-2020\-17154**:
+
+- Anexo 1.1: PER2020 Individual y Colectiva, 2º orden (`q_x` base 2012 y `\lambda_x`).
+- Anexo 1.2: PASEM2020 General (vida\-riesgo), 2º orden.
+- Anexo 1.3: PASEM2020 Decesos, 2º orden.
+- Anexo 2.1: recargos técnicos y PER2020 de primer orden.
+- Anexos 2.2, 2.3 y 2.4: PASEM2020 de primer orden (Rel, NoRel y Decesos).
+
+`python/verificacion_boe.py` coteja casilla por casilla con `boe_anexos.json`: los anexos
+1.1, 1.2, 1.3 y los recargos del 2.1 coinciden exactamente; las de primer orden derivadas
+difieren como mucho 0,001 ‰ por el redondeo del BOE (su apartado séptimo lo advierte).
+
+Derivaciones establecidas, que **no deben reinventarse**:
+
+- **PER Individual desde Colectiva:** `Ind[x] = Col[x-1]` en `[11,85]`; idénticas en 0–10
+  y 97–120; valores propios en 86–96.
+- **PER 1er orden:** `q^{(1)}_{base} = q^{(2)}_{base}(1-\text{recargo}_q)`,
+  `\lambda^{(1)} = \lambda^{(2)} + \text{recargo}_\lambda`. Los recargos del anexo 2.1 son
+  de la Colectiva; los de la Individual siguen el mismo desfase de un año y tienen valores
+  propios en 86–96. Usar los de la Colectiva desvía `_n p_x` hasta 6·10⁻⁴ hacia los 70 años.
+- **PASEM 1er orden:** Rel y Decesos `\times 1{,}101875`; NoRel `\times 1{,}155`.
+
+## 4\. Arquitectura y convenciones de código
+
+Dos implementaciones equivalentes, con el **motor separado de la interfaz**:
+
+| Capa | Python (`python/`) | Web (`web/src/`) |
+| --- | --- | --- |
+| Datos y catálogo | `datos.py` | `data.js` |
+| Motor de tablas y modelos | `tablas.py`, `modelos.py` | `engine.js` |
+| Rentas | `rentas.py` | `rentas.js` |
+| Interfaz | `app.py` (PySide6 + matplotlib) | `App.jsx`, `rentas.jsx` (React + recharts) |
+| Atlas | `atlas.py` | `atlas.jsx` |
+
+- Los dos motores deben dar los mismos números (tolerancia `10^{-8}`; diferencia medida
+  1,1·10⁻¹⁶). Todo cambio de cálculo se hace **en ambos**.
+- Bloque de datos numéricos delimitado por `// @@DATA_START` y `// @@DATA_END`: al tocar
+  la interfaz no se toca ese bloque, y viceversa.
+- Web: recharts como única dependencia de gráficos; esbuild empaqueta en un HTML
+  autocontenido (`web/calculadora_supervivencia.html`), que se copia a `index.html` para
+  GitHub Pages. Estado con `useState`, derivados con `useMemo`.
+- Escritorio: `.exe` con PyInstaller (`build_exe.bat`, `calculadora.spec`); el resultado
+  se mueve a la carpeta `ejecutables/` del espacio de trabajo, fuera del repo.
+- **Validar antes de calcular:** `x\in[0,120]`; `n, m \ge 0`; año entero en `[1900, 2200]`
+  en generacionales. Avisar si `x+m+n > \omega`; error (no resultado) si `l_x = 0`.
+- Presentación: probabilidades a 6 decimales, `l_x` a 2, `toLocaleString("es-ES")`.
+  Filas de resultado con símbolo, descripción y valor, sin fórmula sustituida.
+  Tipografía serif matemática (STIX Two Text) para símbolos y cifras; Public Sans para
+  el resto. Parámetros a la izquierda, resultados a la derecha.
+- Accesibilidad: `aria-pressed` en controles segmentados, `aria-label` en gráficos,
+  `role="alert"` en errores, respeto a `prefers-reduced-motion`.
+
+## 5\. Advertencias
+
+- Los valores del BOE están redondeados; diferencias en el último decimal son esperadas.
+- `_n p_x + {}_n q_x = 1`, pero `_{m\mid n}q_x` **no** forma parte de esa partición.
+- PER2020 generacionales, PASEM2020 estáticas: no aplicar mejora a estas ni comparar
+  generaciones con ellas.
+- Los valores iniciales de los modelos paramétricos **no son publicados**: ajuste propio
+  por mínimos cuadrados a PASEM2020 General 2º orden por sexo (`ajuste_presets.py`).
+  De Moivre fijado en `\omega = 121` porque su ajuste diverge. Se indica en la interfaz.
+
+## 6\. Estado actual
+
+Cinco pestañas, en web y escritorio:
+
+1. **Tablas de mortalidad**: nueve tablas (PER2020 Individual y Colectiva; PASEM2020
+   General, Rel, NoRel y Decesos; 2º y 1er orden). `_n p_x`, `_n q_x`, `_{m\mid n} q_x`,
+   `e_x`, `\mathring e_x` con `x`, `n`, `m` reales.
+2. **Modelos paramétricos**: exponencial, De Moivre, Gompertz, Makeham, Weibull, Perks,
+   Kannisto, Thiele, Siler, Heligman–Pollard; deslizador (log si procede) y campo por
+   parámetro, con PASEM2020 General de referencia.
+3. **Comparación**: hasta 8 escenarios mixtos, cada uno con sexo y parámetros propios;
+   modelos repetidos se numeran.
+4. **Rentas actuariales**: temporal o vitalicia, pre o postpagable, `m` pagos al año,
+   diferimiento `k`, interés `I`; distribución, momentos y métricas de riesgo (§2.1).
+5. **Atlas**: guía de modelos paramétricos y de tablas e hipótesis de interpolación.
+
+Gráficas en las tres primeras: `_t p_x`, `_t q_x` y `\mu_{x+t}` (log/lineal), con marca en
+`t=n` y franja `[m,m+n]`.
+
+## 7\. Hoja de ruta
+
+Pendiente de definir con Antonio. Candidatos detectados al reorganizar (2026-10-07):
+
+- Tests automáticos: paridad Python/JS, identidad de control, `verificacion_boe.py`.
+- Seguros de vida (capitales, primas) sobre el mismo motor de `l_x`.
+
+## 8\. Incorporaciones desde asignaturas
+
+Cuando una mejora proceda de material de clase (guardado en `apuntes/`, fuera del repo),
+anotar aquí: asignatura, qué se incorpora y qué decisiones propias se tomaron.
+
+*(sin entradas todavía)*
