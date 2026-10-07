@@ -76,13 +76,15 @@ no enteras usan interpolación lineal (UDD). x es entera; n y k, múltiplos de 1
 python/   aplicación de escritorio (PySide6 + matplotlib) y generación del .exe
 web/      aplicación web (React + recharts) y el HTML autocontenido ya compilado
 docs/     NOTA_TECNICA.md (base técnica de los cálculos) y SKILL.md
+tests/    tests automáticos (pytest y node --test) y prueba de paridad entre motores
 CLAUDE.md convenciones técnicas, decisiones y hoja de ruta
 CHANGELOG.md  historial de cambios
 ```
 
 El motor está separado de la interfaz: `python/datos.py`, `python/tablas.py`,
 `python/modelos.py` y `python/rentas.py`, con sus equivalentes en `web/src/data.js`, `web/src/engine.js` y `web/src/rentas.js`. Ambos
-motores dan el mismo resultado; la diferencia máxima medida es de 1,1·10⁻¹⁶.
+motores dan el mismo resultado: los tests lo comprueban con tolerancia 10⁻⁸ y la diferencia
+medida es del orden de 10⁻¹⁵ (10⁻¹¹ en los momentos de orden alto de las rentas).
 
 ## Ejecutar
 
@@ -100,19 +102,32 @@ Para el ejecutable de Windows: `build_exe.bat`, que deja `dist\CalculadoraSuperv
 Web: abrir `web/calculadora_supervivencia.html` en el navegador. Para recompilar desde el
 código fuente, `npm install && bash build.mjs` dentro de `web/`.
 
-## Verificación de los datos
+## Tests y verificación de los datos
 
-`python/verificacion_boe.py` compara casilla por casilla los datos del código con los anexos
-del BOE, extraídos a `boe_anexos.json`:
+Una sola orden ejecuta todos los tests (requiere `pytest` y Node.js ≥ 20):
+
+```bash
+python tests/ejecutar_tests.py
+```
+
+Comprueban la construcción de lₓ, la identidad ₘqₓ + ₘ|ₙqₓ + ₘ₊ₙpₓ = 1, la interpolación y
+μ, las esperanzas de vida frente a integración numérica, la coherencia μ = H′ de los modelos,
+que la distribución de cada renta suma 1 y que su media coincide con la valoración pago a
+pago, la igualdad numérica de los dos motores y los datos frente al BOE. El detalle está en
+`docs/NOTA_TECNICA.md` §9.
+
+El cotejo con el BOE también puede lanzarse solo: `python/verificacion_boe.py` compara
+casilla por casilla los datos del código con los anexos, extraídos a `boe_anexos.json`:
 
 ```bash
 cd python && python verificacion_boe.py
 ```
 
-Los anexos 1.1, 1.2, 1.3 y los recargos técnicos del 2.1 coinciden exactamente. Las tablas
-de primer orden que el código deriva difieren como mucho 0,001 ‰ de las publicadas, por el
-redondeo a tres o cuatro decimales con que el BOE las publica (su propio apartado séptimo lo
-advierte y anuncia un documento con el desglose completo de decimales).
+Los anexos 1.1, 1.2, 1.3, los recargos técnicos del 2.1 y la PER2020 Individual de primer
+orden coinciden exactamente. Las tablas de primer orden que el código deriva (PER2020
+Colectiva y PASEM2020) difieren como mucho 0,001 ‰ de las publicadas, por el redondeo con
+que el BOE las publica (su propio apartado séptimo lo advierte y anuncia un documento con
+el desglose completo de decimales).
 
 ## Advertencias
 
@@ -123,9 +138,9 @@ advierte y anuncia un documento con el desglose completo de decimales).
 - ₙpₓ y ₙqₓ suman 1, pero ₘ|ₙqₓ **no** forma parte de esa partición: se solapa con ambos.
 - Las PASEM2020 son estáticas: no se les aplica factor de mejora ni se comparan generaciones
   con ellas.
-- Los recargos del anexo 2.1 están tabulados para la PER2020 Colectiva. La Individual tiene
-  los suyos: el mismo desfase de un año que las qₓ, más valores propios entre 86 y 96 años.
-  Usar los de la Colectiva desvía ₙpₓ hasta 6·10⁻⁴ en torno a los 70 años.
+- Los recargos del anexo 2.1 están tabulados solo para la PER2020 Colectiva. La Individual
+  de primer orden se toma por eso tal cual de la tabla publicada en el mismo anexo: aplicarle
+  los recargos de la Colectiva desviaría ₙpₓ hasta 6·10⁻⁴ en torno a los 70 años.
 
 ## Fuente
 

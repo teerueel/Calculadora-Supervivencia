@@ -5,7 +5,7 @@ controles. Describe lo que está **implementado**, no lo planificado.
 
 | | |
 | --- | --- |
-| Versión de la nota | 1.0 |
+| Versión de la nota | 1.1 |
 | Fecha | 7 de octubre de 2026 |
 | Estado del producto | Tablas, modelos paramétricos, comparación, rentas actuariales y atlas |
 | Implementaciones | Python (`python/`) y JavaScript (`web/src/`), numéricamente equivalentes |
@@ -47,16 +47,20 @@ de 17 de diciembre de 2020, BOE núm. 338, de 28 de diciembre de 2020
 | 1.1 | PER2020 Colectiva e Individual, 2º orden: $q_x$ base 2012 y $\lambda_x$ | Datos de partida |
 | 1.2 | PASEM2020 General (vida-riesgo), 2º orden, base 2019 | Datos de partida |
 | 1.3 | PASEM2020 Decesos, 2º orden, base 2019 | Datos de partida |
-| 2.1 | Recargos técnicos de la PER2020 para el 1er orden | Derivación (§3.3) |
+| 2.1 | PER2020 Individual, 1er orden: $q_x$ base 2012 y $\lambda_x$ | Datos de partida, tal cual |
+| 2.1 | Recargos técnicos de la PER2020 Colectiva para el 1er orden | Derivación de la Colectiva de 1er orden (§3.3) |
 | 2.2–2.4 | PASEM2020 de 1er orden: Rel, NoRel y Decesos | Derivación (§3.3) |
 
 Edades 0 a 120, por sexo. Las $q_x$ se publican en tanto por mil.
 
 **Verificación.** `python/verificacion_boe.py` compara casilla por casilla los datos del
-código con los anexos extraídos del PDF (`python/boe_anexos.json`). Los anexos 1.1, 1.2, 1.3
-y los recargos del 2.1 coinciden exactamente. Las tablas de primer orden derivadas difieren
-de las publicadas como máximo en 0,001 ‰, por el redondeo a tres o cuatro decimales con que
-las publica el BOE (lo advierte su apartado séptimo). Esas diferencias no se corrigen.
+código con los anexos extraídos del PDF (`python/boe_anexos.json`) y forma parte de los
+tests automáticos (§9). Los anexos 1.1, 1.2, 1.3, los recargos del 2.1 y la PER2020
+Individual de 1er orden coinciden exactamente. Las tablas de primer orden derivadas (PER2020
+Colectiva y PASEM2020) difieren de las publicadas como máximo en 0,001 ‰ en $q_x$ (máximo
+medido: 0,0009 ‰) y en una unidad del cuarto decimal en $\lambda_x$, por el redondeo con que
+las publica el BOE (lo advierte su apartado séptimo). Esas son las tolerancias del cotejo;
+las diferencias no se corrigen.
 
 ## 3. Construcción del vector de mortalidad
 
@@ -83,14 +87,18 @@ $q_y = q^{\,2019}_y / 1000$, sin factor de mejora.
 $\text{Ind}[x] = \text{Col}[x-1]$ para $x \in [11, 85]$; idénticas en 0–10 y 97–120;
 valores propios tabulados en 86–96. Aplica a $q_x$ y a $\lambda_x$.
 
-**PER2020 de primer orden** (anexo 2.1), con el recargo de $q$ expresado en tanto por ciento:
+**PER2020 Colectiva de primer orden** (anexo 2.1), con el recargo de $q$ expresado en tanto
+por ciento:
 
 $$q^{(1)}_{\text{base}} = q^{(2)}_{\text{base}}\left(1 - \tfrac{r_q}{100}\right),\qquad
 \lambda^{(1)} = \lambda^{(2)} + r_\lambda .$$
 
-Los recargos del anexo están tabulados para la Colectiva. Para la Individual se aplican con
-el mismo desfase de un año en 11–85 y con valores propios en 86–96. Usar los recargos de la
-Colectiva en la Individual desviaría $_n p_x$ hasta $6\cdot10^{-4}$ en torno a los 70 años.
+**PER2020 Individual de primer orden:** se toma **tal cual** de la tabla publicada en el
+anexo 2.1 ($q_x$ base 2012 y $\lambda_x$), sin derivarla. Los recargos del anexo están
+tabulados solo para la Colectiva; los de la Individual en 86–96 no se publican y
+reconstruirlos (versión 1.0) desviaba $q_x$ hasta 0,007 ‰ y $\lambda_x$ hasta $10^{-4}$, con
+efecto de hasta $8{,}6\cdot10^{-4}$ en $_n p_x$ (hombre, $x = 47$, $n = 50$, año 2026).
+Aplicar sin más los recargos de la Colectiva desviaría $_n p_x$ hasta $6\cdot10^{-4}$.
 
 **PASEM2020 de primer orden** (anexos 2.2–2.4), acotando a 1000 ‰:
 
@@ -225,7 +233,9 @@ $n$ (temporal) o vitalicia, prepagable o postpagable. Cuantía por plazo $c$ y c
 anual $C = m\,c$. Tipo efectivo anual constante $I$, $v = (1+I)^{-1}$; cada plazo $1/m$ se
 descuenta con $v^{1/m}$. Edad máxima $w = 120$; en la vitalicia $n = w + 1 - x - k$.
 
-Se exige $n$ y $k$ múltiplos de $1/m$, $c > 0$, $I > -1$ y, en la vitalicia, $x + k < 121$.
+Se exige $n$ y $k$ múltiplos de $1/m$, $c > 0$, $I > -1$, $l_x > 0$ con la tabla elegida
+(si nadie llega a la edad $x$ se muestra un error, no un resultado) y, en la vitalicia,
+$x + k < 121$.
 
 Rentas financieras unitarias:
 
@@ -270,9 +280,13 @@ catálogo; los modelos paramétricos no intervienen.
 logarítmica) y función de distribución $F(y)$ escalonada, ambas con marcas en $E[Y]$ y en
 $\text{VaR}_{99{,}5\%}$.
 
-**Comprobaciones:** la suma de las probabilidades es 1 (el motor la devuelve con cada
-cálculo), y $E[Y]$ debe coincidir con la valoración pago a pago. Su automatización forma
-parte de la fase 1 de la hoja de ruta.
+**Comprobaciones** (automatizadas, §9): la suma de las probabilidades es 1 (el motor la
+devuelve con cada cálculo) y $E[Y]$ coincide con la valoración pago a pago,
+
+$${}_{k\mid}\ddot a^{(m)}_{x:\overline{n}|} = \sum_{j=0}^{N-1} \frac{v^{k+j/m}}{m}\,{}_{k+j/m}p_x,\qquad
+{}_{k\mid}a^{(m)}_{x:\overline{n}|} = \sum_{j=1}^{N} \frac{v^{k+j/m}}{m}\,{}_{k+j/m}p_x ,$$
+
+multiplicada por $C$.
 
 ## 9. Implementación y equivalencia numérica
 
@@ -282,8 +296,33 @@ parte de la fase 1 de la hoja de ruta.
 | Tablas y modelos | `tablas.py`, `modelos.py` | `engine.js` |
 | Rentas | `rentas.py` | `rentas.js` |
 
-Los dos motores deben coincidir con tolerancia $10^{-8}$; la diferencia máxima medida es
-$1{,}1\cdot10^{-16}$. Todo cambio de cálculo se hace en ambos.
+Los dos motores deben coincidir con tolerancia $10^{-8}$ (relativa si el valor supera 1).
+Todo cambio de cálculo se hace en ambos. Diferencias máximas medidas por la prueba de
+paridad: 0 en los datos y valores iniciales; $\sim 10^{-15}$ en $q$, $l$, probabilidades,
+esperanzas y $\mu$ (tablas y modelos); $\sim 10^{-11}$ en rentas (momentos de orden alto).
+
+**Función $\Phi$ (Thiele).** Python usa `math.erf`. JavaScript no la trae, así que
+`engine.js` calcula $\operatorname{erfc}$ con precisión de doble: serie de Taylor de
+$\operatorname{erf}$ para $|x| < 3$ y fracción continua de Laplace (algoritmo de Lentz) para
+$|x| \ge 3$. Sustituye a la aproximación de la versión 1.0 (error $\sim 10^{-7}$ y un salto
+de $\Phi$ en $x = c$).
+
+**Tests automáticos.** `python tests/ejecutar_tests.py` lanza `pytest` sobre el motor Python
+y `node --test` sobre el web. Comprueban, en rejillas de casos de todas las tablas, sexos,
+hipótesis de interpolación, modelos y rentas:
+
+- datos de las tablas frente al BOE (§2), con las tolerancias indicadas allí;
+- $l_0 = 100\,000$, $l$ no creciente, $l_{y+1} = l_y(1 - q_y)$, $q_{120} = 1$, $l_{121} = 0$;
+- identidad de control (§6) y $_n p_x + {}_n q_x = 1$, con tolerancia $10^{-12}$;
+- interpolación (§5): $_s p_y$ según la hipótesis y $\mu_a = -\,d\ln l_a/da$ numérica;
+- $\mathring e_x$ frente a integración numérica de $l$ y, con UDD y $x$ entera,
+  $\mathring e_x = e_x + \tfrac12$ exactamente; error si $l_x = 0$;
+- modelos continuos: $S(0) = 1$, $S$ no creciente y $\mu = H'$ (coherencia de las fórmulas
+  del §7.1); Heligman–Pollard frente a su definición;
+- rentas: probabilidades $\ge 0$ que suman 1, valores crecientes, $E[Y]$ igual a la
+  valoración pago a pago (§8.3) con tolerancia $10^{-12}$, coherencia de varianza,
+  cuantiles, VaR y TVaR, y validación de parámetros;
+- paridad Python/JS de todo lo anterior y de los mensajes de validación.
 
 ## 10. Hipótesis y limitaciones
 
@@ -301,3 +340,4 @@ $1{,}1\cdot10^{-16}$. Todo cambio de cálculo se hace en ambos.
 | Versión | Fecha | Cambio |
 | --- | --- | --- |
 | 1.0 | 2026-10-07 | Primera versión: tablas, modelos paramétricos, comparación y rentas actuariales. |
+| 1.1 | 2026-10-07 | Fase 1. PER2020 Individual de 1er orden tomada tal cual del anexo 2.1 (§3.3); tolerancias del cotejo con el BOE (§2); error en rentas si $l_x = 0$ (§8.1); $\operatorname{erfc}$ de precisión doble en JS y tests automáticos (§9). |

@@ -2,6 +2,35 @@
 
 Entradas de la más reciente a la más antigua. Cada sesión de trabajo con cambios añade una.
 
+## 2026-10-07: Fase 1 · Base de calidad (tests automáticos)
+
+- Nueva carpeta `tests/` con la batería automática y un script único,
+  `python tests/ejecutar_tests.py` (también `npm test` en `web/`):
+  - `tests/python` (pytest): construcción de lₓ, identidad de control, interpolación y μ,
+    e̊ₓ frente a integración numérica y e̊ₓ = eₓ + ½ con UDD, coherencia μ = H′ de los
+    modelos, distribución de las rentas (Σ prob = 1, media = valoración pago a pago,
+    métricas), validaciones y cotejo con el BOE.
+  - `tests/js` (`node --test`): las mismas identidades sobre el motor web.
+  - Paridad Python/JS (`test_paridad.py` + `tests/js/volcado.mjs`): datos, presets, q y l,
+    ~15 000 casos de tablas, modelos, rentas y mensajes de validación, con tolerancia 10⁻⁸.
+- `verificacion_boe.py` se reorganiza en `comprobaciones()` para usarlo desde los tests
+  (misma salida al ejecutarlo a mano; devuelve código 1 si algo no cuadra).
+- **Correcciones que destaparon los tests:**
+  - **PER2020 Individual de 1er orden**: se toma tal cual del anexo 2.1. Antes se derivaba con
+    unos recargos reconstruidos en 86–96 que desviaban qₓ hasta 0,007 ‰, λₓ hasta 10⁻⁴ y
+    ₙpₓ hasta 8,6·10⁻⁴. Cambia los resultados de esa tabla.
+  - Tolerancias del cotejo con el BOE alineadas con lo documentado (0,001 ‰ en q, 10⁻⁴ en λ):
+    la PER Colectiva de 1er orden marcaba «DIF» por redondeo del BOE.
+  - Rentas con lₓ = 0 (p. ej. PASEM a partir de 111 años): ahora dan un error en las dos
+    interfaces; antes, división por cero en escritorio y NaN en la web.
+  - Web: eₓ = NaN cuando lₓ = 0, como en Python.
+  - Web: `erfc` de precisión doble para Φ en Thiele (antes, aproximación con error ~10⁻⁷ y
+    un salto en x = c). Diferencia con Python ahora ~10⁻¹⁵.
+  - Web: `validar` comprueba también que m sea entero positivo, como en Python.
+- `docs/NOTA_TECNICA.md` v1.1. `CLAUDE.md`: decisiones de la fase 1 y fase activa 2.
+- `pytest` añadido a `python/requirements.txt`; `"type": "module"` en `web/package.json`.
+- HTML autocontenido e `index.html` recompilados.
+
 ## 2026-10-07: Reorganización como proyecto profesional
 
 - La calculadora pasa a ser un proyecto independiente de las asignaturas, orientado a uso

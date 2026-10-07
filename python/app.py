@@ -1001,6 +1001,8 @@ class RentasTab(CalcTab):
                            f"y v<sup>1/{m}</sup> para cada plazo." if math.isfinite(c) and m > 1 else
                            "Cuantía anual C = c; descuento v = (1 + I)⁻¹.")
         e = rentas.validar(x, n, m, k, I, c, vit, per, year)
+        if not e:
+            e = rentas.validar_tabla(key, sex, int(year) if per else 2019, x)
         try:
             ords = parse_ordenes(self.fo.edit.text())
         except ValueError:

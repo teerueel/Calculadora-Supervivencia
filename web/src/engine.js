@@ -80,10 +80,32 @@ export function tableModel(key, sex, year, x, metodo) {
 }
 
 /* ============================ Modelos paramétricos ============================ */
+/* erfc con precisión de doble (JS no trae Math.erf; Python usa math.erf):
+   |x| < 3: serie de Taylor  erf x = (2/√π) Σ (−1)ⁿ x^(2n+1) / (n! (2n+1));
+   |x| ≥ 3: fracción continua  erfc x = e^(−x²)/√π · 1/(x + ½/(x + 1/(x + (3/2)/(x + …)))) (Lentz). */
 function erfc(x) {
-  const z = Math.abs(x), t = 1 / (1 + 0.5 * z);
-  const r = t * Math.exp(-z * z - 1.26551223 + t * (1.00002368 + t * (0.37409196 + t * (0.09678418 +
-    t * (-0.18628806 + t * (0.27886807 + t * (-1.13520398 + t * (1.48851587 + t * (-0.82215223 + t * 0.17087277)))))))));
+  const ax = Math.abs(x);
+  if (ax < 3) {
+    const x2 = x * x;
+    let term = x, sum = x;
+    for (let n = 1; n < 200; n++) {
+      term *= -x2 / n;
+      const add = term / (2 * n + 1);
+      sum += add;
+      if (Math.abs(add) <= 1e-17 * Math.abs(sum)) break;
+    }
+    return 1 - (2 / Math.sqrt(Math.PI)) * sum;
+  }
+  let f = ax, C = ax, D = 0;
+  for (let n = 1; n < 500; n++) {
+    const a = n / 2;
+    D = 1 / (ax + a * D);
+    C = ax + a / C;
+    const delta = C * D;
+    f *= delta;
+    if (Math.abs(delta - 1) < 1e-16) break;
+  }
+  const r = Math.exp(-ax * ax) / (Math.sqrt(Math.PI) * f);
   return x >= 0 ? r : 2 - r;
 }
 const Phi = (z) => 0.5 * erfc(-z / Math.SQRT2);
@@ -181,7 +203,7 @@ export function results(M, x, n, m) {
   const lx = M.L(x), lxn = M.L(x + n), lxm = M.L(x + m), lxmn = M.L(x + m + n);
   const npx = lx > 0 ? lxn / lx : NaN;
   const r = { lx, lxn, lxm, lxmn, npx, nqx: 1 - npx, mnqx: (lxm - lxmn) / lx, mqx: 1 - lxm / lx, mnpx: lxmn / lx, ecx: M.ecx(x) };
-  if (M.kind !== "cont") { let e = 0; for (let k = 1; x + k < OMEGA; k++) e += M.L(x + k) / lx; r.ex = e; }
+  if (M.kind !== "cont") { let e = 0; for (let k = 1; x + k < OMEGA; k++) e += M.L(x + k) / lx; r.ex = lx > 0 ? e : NaN; }
   return r;
 }
 

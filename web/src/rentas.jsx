@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { TABLES } from "./data.js";
 import { isPer, cohortOf } from "./engine.js";
-import { W, PCTS, validar, calcular, parseOrdenes, frac } from "./rentas.js";
+import { W, PCTS, validar, validarTabla, calcular, parseOrdenes, frac } from "./rentas.js";
 
 /* ============================ Formato ============================ */
 const SUP = { "-": "⁻", 0: "⁰", 1: "¹", 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶", 7: "⁷", 8: "⁸", 9: "⁹" };
@@ -120,6 +120,7 @@ export default function Rentas({ ui }) {
   const x = parseNum(xS), n = parseNum(nS), k = parseNum(kS), year = parseNum(yearS), c = parseNum(cS), I = parseNum(iS) / 100;
   const ordenes = parseOrdenes(oS);
   let err = validar({ x, n, m, k, I, c, vit, needYear: per, year });
+  if (!err) err = validarTabla({ key, sex, year: per ? Math.round(year) : 2019, x });
   if (!err && !ordenes) err = "Los órdenes s deben ser enteros entre 1 y 12, separados por comas o como rango (1-4).";
 
   const D = useMemo(() => (err ? null : calcular({ key, sex, year: per ? Math.round(year) : 2019, x, n, m, k, I, c, pre, vit, ordenes })),

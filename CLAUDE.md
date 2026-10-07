@@ -88,18 +88,21 @@ Resolución de la DGSFP de 17 de diciembre de 2020, **BOE\-A\-2020\-17154**:
 - Anexo 2.1: recargos técnicos y PER2020 de primer orden.
 - Anexos 2.2, 2.3 y 2.4: PASEM2020 de primer orden (Rel, NoRel y Decesos).
 
-`python/verificacion_boe.py` coteja casilla por casilla con `boe_anexos.json`: los anexos
-1.1, 1.2, 1.3 y los recargos del 2.1 coinciden exactamente; las de primer orden derivadas
-difieren como mucho 0,001 ‰ por el redondeo del BOE (su apartado séptimo lo advierte).
+`python/verificacion_boe.py` coteja casilla por casilla con `boe_anexos.json` (y es parte
+de los tests): los anexos 1.1, 1.2, 1.3, los recargos del 2.1 y la PER Individual de 1er
+orden coinciden exactamente; las de primer orden derivadas difieren como mucho 0,001 ‰ en
+`q` y una unidad del 4º decimal en `\lambda` por el redondeo del BOE (su apartado séptimo
+lo advierte). Esas son las tolerancias del cotejo.
 
 Derivaciones establecidas, que **no deben reinventarse**:
 
 - **PER Individual desde Colectiva:** `Ind[x] = Col[x-1]` en `[11,85]`; idénticas en 0–10
   y 97–120; valores propios en 86–96.
-- **PER 1er orden:** `q^{(1)}_{base} = q^{(2)}_{base}(1-\text{recargo}_q)`,
-  `\lambda^{(1)} = \lambda^{(2)} + \text{recargo}_\lambda`. Los recargos del anexo 2.1 son
-  de la Colectiva; los de la Individual siguen el mismo desfase de un año y tienen valores
-  propios en 86–96. Usar los de la Colectiva desvía `_n p_x` hasta 6·10⁻⁴ hacia los 70 años.
+- **PER Colectiva 1er orden:** `q^{(1)}_{base} = q^{(2)}_{base}(1-\text{recargo}_q)`,
+  `\lambda^{(1)} = \lambda^{(2)} + \text{recargo}_\lambda` (recargos del anexo 2.1).
+- **PER Individual 1er orden: tal cual del anexo 2.1** (`PER_IND1_*`), sin derivar. Sus
+  recargos en 86–96 no se publican; reconstruirlos desviaba `_n p_x` hasta 8,6·10⁻⁴ y usar
+  los de la Colectiva, hasta 6·10⁻⁴. Decidido el 2026-10-07 (fase 1).
 - **PASEM 1er orden:** Rel y Decesos `\times 1{,}101875`; NoRel `\times 1{,}155`.
 
 ## 4\. Arquitectura y convenciones de código
@@ -115,7 +118,16 @@ Dos implementaciones equivalentes, con el **motor separado de la interfaz**:
 | Atlas | `atlas.py` | `atlas.jsx` |
 
 - Los dos motores deben dar los mismos números (tolerancia `10^{-8}`; diferencia medida
-  1,1·10⁻¹⁶). Todo cambio de cálculo se hace **en ambos**.
+  ~10⁻¹⁵ en tablas y modelos, ~10⁻¹¹ en rentas). Todo cambio de cálculo se hace **en
+  ambos**, y la prueba de paridad (`tests/python/test_paridad.py`) lo comprueba.
+- JS no tiene `Math.erf`: `engine.js` implementa `erfc` con precisión de doble (Taylor +
+  fracción continua). No volver a aproximaciones de ~10⁻⁷.
+- **Tests** (`tests/`): `python tests/ejecutar_tests.py` ejecuta `pytest tests/python` y
+  `node --test tests/js/*.test.mjs` (también `npm test` en `web/`). Requiere `pytest`
+  (`requirements.txt`) y Node ≥ 20. Las rejillas de casos están en `tests/python/casos.py`;
+  `tests/js/volcado.mjs` expone el motor web a la prueba de paridad. Todo cálculo nuevo
+  llega con sus tests (identidades, comprobación independiente y paridad).
+- `web/package.json` tiene `"type": "module"` para que Node importe `web/src/` directamente.
 - Bloque de datos numéricos delimitado por `// @@DATA_START` y `// @@DATA_END`: al tocar
   la interfaz no se toca ese bloque, y viceversa.
 - Web: recharts como única dependencia de gráficos; esbuild empaqueta en un HTML
@@ -161,6 +173,9 @@ Cinco pestañas, en web y escritorio:
 Gráficas en las tres primeras: `_t p_x`, `_t q_x` y `\mu_{x+t}` (log/lineal), con marca en
 `t=n` y franja `[m,m+n]`.
 
+**Base de calidad (fase 1, cerrada):** batería de tests automáticos en `tests/` (≈340 en
+Python con paridad incluida, ≈170 en JS; ~1 min). Detalle en `docs/NOTA_TECNICA.md` §9.
+
 ### 6\.1 Flujo de trabajo para cada cambio
 
 Toda nueva funcionalidad o corrección sigue estos pasos, en este orden:
@@ -174,8 +189,8 @@ Toda nueva funcionalidad o corrección sigue estos pasos, en este orden:
 3. **Plan breve**: qué se cambia, en qué capas y ficheros, qué fórmulas; si hay una
    decisión de criterio actuarial, preguntar a Antonio antes de programar.
 4. **Implementar en ambos motores** (Python y JS) y en ambas interfaces.
-5. **Verificar**: tests (desde la fase 1), identidades de control, paridad Python/JS y
-   comprobación visual de la interfaz.
+5. **Verificar**: `python tests/ejecutar_tests.py` en verde (añadiendo los tests del cambio:
+   identidades, comprobación independiente y paridad) y comprobación visual de la interfaz.
 6. **Documentar en el mismo commit**:
    - `docs/NOTA_TECNICA.md`: toda fórmula, hipótesis, dato o magnitud nueva o cambiada;
      subir versión y añadir línea en su historial (§11). **Obligatorio** si cambia algún
@@ -213,7 +228,19 @@ Cada contenido nuevo es una pieza en una capa, sin rehacer las demás.
 | 3 | **Probabilidades de grupo** | Vida conjunta (disolución) y último superviviente (extinción) para dos o más cabezas, cada una con su tabla y sexo. Se crea la capa de estado. |
 | 4 | **Carteras y exportación** | Cargar una BBDD de asegurados, valorar en lote; exportar a Excel y PDF. |
 
-**Fase activa: 1.** Las decisiones de diseño de cada fase se anotan aquí al cerrarla.
+**Fase activa: 2.** Las decisiones de diseño de cada fase se anotan aquí al cerrarla.
+
+**Fase 1, cerrada el 2026-10-07.** Decisiones:
+
+- `pytest` para Python y el ejecutor nativo `node --test` para JS (sin dependencias nuevas);
+  script único `tests/ejecutar_tests.py`.
+- Paridad: Python genera los casos, Node los calcula con el motor web y se comparan con
+  tolerancia `10^{-8}` relativa. Identidades con `10^{-12}`.
+- Tolerancias del cotejo con el BOE: 0,001 ‰ en `q` y `10^{-4}` en `\lambda` para las tablas
+  de 1er orden que se derivan; exactas el resto.
+- Correcciones que destaparon los tests: PER Individual de 1er orden tomada del BOE (§3);
+  error en rentas si `l_x = 0` (antes, división por cero en Python y NaN en la web);
+  `e_x` = NaN si `l_x = 0` también en la web; `erfc` de precisión doble en JS.
 
 ### 7\.3 Tipo de interés técnico
 

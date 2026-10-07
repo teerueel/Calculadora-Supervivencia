@@ -4,5 +4,7 @@ matplotlib>=3.8
 # Solo para regenerar los parámetros iniciales (ajuste_presets.py)
 numpy>=1.26
 scipy>=1.11
+# Solo para los tests (python ../tests/ejecutar_tests.py)
+pytest>=8.0
 # Solo para generar el .exe
 pyinstaller>=6.3

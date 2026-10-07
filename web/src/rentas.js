@@ -21,6 +21,7 @@ const isMult = (v, m) => Math.abs(v * m - Math.round(v * m)) < 1e-9;
 
 export function validar({ x, n, m, k, I, c, vit, needYear, year }) {
   if (!Number.isFinite(x) || x < 0 || x > W || Math.abs(x - Math.round(x)) > 1e-9) return "La edad x debe ser un número entero entre 0 y 120.";
+  if (!(Number.isInteger(m) && m >= 1)) return "El número de pagos al año m debe ser un entero positivo.";
   if (!Number.isFinite(k) || k < 0 || !isMult(k, m)) return `El diferimiento k debe ser ≥ 0 y múltiplo de 1/${m}.`;
   if (!vit && (!Number.isFinite(n) || n <= 0 || !isMult(n, m))) return `El horizonte n debe ser > 0 y múltiplo de 1/${m}.`;
   if (vit && Math.round(x) + k >= W + 1) return "Con este diferimiento nadie llega a cobrar: x + k debe ser menor que w + 1 = 121.";
@@ -28,6 +29,19 @@ export function validar({ x, n, m, k, I, c, vit, needYear, year }) {
   if (!Number.isFinite(c) || c <= 0) return "La cuantía de cada plazo debe ser positiva.";
   if (needYear && (!Number.isFinite(year) || Math.abs(year - Math.round(year)) > 1e-9 || year < 1900 || year > 2200))
     return "El año de cálculo debe ser un entero entre 1900 y 2200.";
+  return null;
+}
+
+function lxVector(key, sex, year, x) {
+  const cohort = isPer(key) ? cohortOf(year, x) : null;
+  return { cohort, l: buildLx(mortalityVector(key, sex, cohort ?? 0)) };
+}
+
+/* Error si, con la tabla elegida, nadie llega a la edad x (l_x = 0) */
+export function validarTabla({ key, sex, year, x }) {
+  const { l } = lxVector(key, sex, year, x);
+  if (!(lAt(l, Math.round(x), "lin") > 0))
+    return `Con esta tabla nadie llega a la edad x = ${Math.round(x)} (lₓ = 0): elige una edad menor.`;
   return null;
 }
 
@@ -99,8 +113,9 @@ export function metricas(rows) {
 }
 
 export function calcular({ key, sex, year, x, n, m, k, I, c, pre, vit, ordenes = [1, 2] }) {
-  const cohort = isPer(key) ? cohortOf(year, x) : null;
-  const l = buildLx(mortalityVector(key, sex, cohort ?? 0));
+  const e = validarTabla({ key, sex, year, x });
+  if (e) throw new Error(e);
+  const { cohort, l } = lxVector(key, sex, year, x);
   const D = distribucion(l, x, n, m, k, I, c, pre, vit);
   D.momentos = momentos(D.rows, ordenes);
   D.metricas = metricas(D.rows);

@@ -58,6 +58,19 @@ def validar(x, n, m, k, I, c, vitalicia, need_year=False, year=None):
     return None
 
 
+def _lx_vector(key, sex, year, x):
+    cohort = (year - math.floor(x)) if tablas.is_per(key) else 0
+    return cohort, tablas.build_lx(tablas.mortality_vector(key, sex, cohort))
+
+
+def validar_tabla(key, sex, year, x):
+    """Error si, con la tabla elegida, nadie llega a la edad x (l_x = 0)."""
+    _, l = _lx_vector(key, sex, year, x)
+    if tablas.l_at(l, round(x), "lin") <= 0:
+        return f"Con esta tabla nadie llega a la edad x = {round(x)} (lₓ = 0): elige una edad menor."
+    return None
+
+
 def frac(p, m):
     """Plazo p/m como en los apuntes: '47', '1/12' o '47+1/12'."""
     q, r = divmod(p, m)
@@ -154,9 +167,10 @@ def metricas(rows):
 
 
 def calcular(key, sex, year, x, n, m, k, I, c, pre, vitalicia, ordenes=(1, 2)):
-    cohort = (year - math.floor(x)) if tablas.is_per(key) else 0
-    q = tablas.mortality_vector(key, sex, cohort)
-    l = tablas.build_lx(q)
+    e = validar_tabla(key, sex, year, x)
+    if e:
+        raise ValueError(e)
+    cohort, l = _lx_vector(key, sex, year, x)
     D = distribucion(l, x, n, m, k, I, c, pre, vitalicia)
     D["momentos"] = momentos(D["rows"], ordenes)
     D["metricas"] = metricas(D["rows"])

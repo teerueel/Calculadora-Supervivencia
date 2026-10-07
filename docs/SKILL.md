@@ -116,21 +116,22 @@ PER2020 Individual · PER2020 Colectiva · PASEM2020 General (vida-riesgo) · PA
 
 **Primer orden** (con recargos, anexo 2.1 y apartado cuarto):
 
-- PER2020: $q^{(1)}_{base} = q^{(2)}_{base}(1-\text{recargo}_q)$ y
+- PER2020 Colectiva: $q^{(1)}_{base} = q^{(2)}_{base}(1-\text{recargo}_q)$ y
   $\lambda^{(1)} = \lambda^{(2)} + \text{recargo}_\lambda$.
+- PER2020 Individual: **tal cual de la tabla publicada en el anexo 2.1**, sin derivar.
 - PASEM2020 Rel (anexo 2.2) y Decesos (anexo 2.4): $q^{(2)} \times 1{,}101875$.
 - PASEM2020 NoRel (anexo 2.3): $q^{(2)} \times 1{,}155$, acotando a 1000‰.
 
 **Relación Individual–Colectiva (PER2020):** `Ind[x] = Col[x-1]` para $x\in[11,85]$;
 coinciden en 0–10 y 97–120; en 86–96 la Individual tiene valores propios tabulados.
-Aplica igual a $q_x$, a $\lambda_x$ **y a los dos recargos del anexo 2.1**, que solo están
-tabulados para la Colectiva (la Individual tiene además recargos propios en 86–96). Usar
-los recargos de la Colectiva en la Individual desvía $_n p_x$ hasta 6·10⁻⁴ hacia los 70
-años: es un error fácil de cometer y difícil de ver.
+Aplica igual a $q_x$ y a $\lambda_x$. Los recargos del anexo 2.1 solo están tabulados para
+la Colectiva y los de la Individual en 86–96 no se publican: por eso la Individual de 1er
+orden se toma del BOE. Aplicarle los recargos de la Colectiva desvía $_n p_x$ hasta 6·10⁻⁴,
+y reconstruir los de 86–96, hasta 8,6·10⁻⁴: errores fáciles de cometer y difíciles de ver.
 
-**Verificación frente al BOE:** los anexos 1.1, 1.2, 1.3 y los recargos del 2.1 del código
-coinciden casilla por casilla con el PDF. Las tablas de primer orden derivadas difieren
-como mucho 0,001 ‰ de las publicadas, por el redondeo a 3 o 4 decimales que el propio BOE
+**Verificación frente al BOE:** los anexos 1.1, 1.2, 1.3, los recargos del 2.1 y la PER
+Individual de 1er orden coinciden casilla por casilla con el PDF. Las tablas de primer orden
+derivadas difieren como mucho 0,001 ‰ de las publicadas, por el redondeo que el propio BOE
 declara en su apartado séptimo; no se "corrigen" forzando cifras.
 
 ### 5. Presentación
@@ -281,6 +282,9 @@ $a_{\overline{n-1/m}|}$.
   (`datos.py`, `tablas.py`, `modelos.py`, `rentas.py`) y .exe con PyInstaller (`calculadora.spec`).
 - Ambos motores deben dar el mismo resultado (tolerancia $10^{-8}$): al cambiar uno,
   cambiar el otro y comparar.
+- **Tests:** `python tests/ejecutar_tests.py` (pytest + `node --test`, con prueba de
+  paridad). Todo cálculo nuevo llega con sus tests: identidades, una comprobación
+  independiente (p. ej. la prima pura pago a pago) y su entrada en la prueba de paridad.
 
 ## Errores frecuentes
 
