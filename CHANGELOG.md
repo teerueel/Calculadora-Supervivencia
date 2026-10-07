@@ -10,6 +10,8 @@ Entradas de la más reciente a la más antigua. Cada sesión de trabajo con camb
   cálculo, fuentes, arquitectura, estado actual y hoja de ruta (sin el enfoque de asignatura).
 - Se añade este `CHANGELOG.md`.
 - `README.md`: presentación como herramienta profesional y estructura actualizada.
+- `docs/SKILL.md`: sección inicial con la ubicación del proyecto, qué leer al empezar y
+  reglas de trabajo; sin referencias a la asignatura.
 
 ## 2026-10-07: Rentas actuariales y web actualizada
 

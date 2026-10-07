@@ -1,12 +1,50 @@
 ---
-name: calculadora-supervivencia
-description: Calcula y representa probabilidades actuariales de supervivencia y fallecimiento (ₙpₓ, ₙqₓ, ₘ|ₙqₓ, eₓ, ₜpₓ con edades no enteras) a partir de las tablas PER2020 y PASEM2020 de la DGSFP o de leyes paramétricas de mortalidad (exponencial, De Moivre, Gompertz, Makeham, Weibull, Perks, Kannisto, Thiele, Siler, Heligman–Pollard), construyendo siempre la función lₓ. Úsala para crear, ampliar o revisar la calculadora (artifact web o app de escritorio Python), añadir tablas o modelos, interpolar entre edades o representar supervivencia, distribución y hazard rate.
+name: "calculadora-supervivencia"
+description: Calcula y representa probabilidades actuariales de supervivencia y fallecimiento (ₙpₓ, ₙqₓ, ₘ|ₙqₓ, eₓ, ₜpₓ con edades no enteras) y la distribución, momentos y métricas de rentas actuariales (ₖ|ä⁽ᵐ⁾ₓ:ₙ⌉, ₖ|a⁽ᵐ⁾ₓ:ₙ⌉) a partir de las tablas PER2020 y PASEM2020 de la DGSFP o de leyes paramétricas de mortalidad (exponencial, De Moivre, Gompertz, Makeham, Weibull, Perks, Kannisto, Thiele, Siler, Heligman–Pollard), construyendo siempre la función lₓ. Úsala para crear, ampliar o revisar la calculadora profesional de Antonio (proyecto en Desktop\PROYECTOS\CALCULADORA CLAUDE: web React y escritorio Python), añadir tablas, modelos o productos, interpolar entre edades o representar supervivencia, distribución y hazard rate.
 ---
 
 # Calculadora actuarial de supervivencia
 
-Procedimiento para construir o extender una calculadora de probabilidades de
-supervivencia y fallecimiento basada en tablas de mortalidad españolas.
+Procedimiento para construir o extender la calculadora actuarial de Antonio: una
+herramienta de **uso profesional** (ya no didáctica) basada en tablas de mortalidad
+españolas y leyes paramétricas, independiente de las asignaturas del máster.
+
+## Antes de nada: el proyecto vive en una carpeta
+
+Todo el contexto está en `C:\Users\Antonio\Desktop\PROYECTOS\CALCULADORA CLAUDE`
+(en su ordenador con Windows). Al empezar cualquier trabajo sobre la calculadora:
+
+1. Si la carpeta no está conectada a la conversación, pedir acceso a ella.
+2. Leer `CLAUDE.md` de la carpeta (estructura y reglas de trabajo) y después
+   `repo/CLAUDE.md` (convenciones técnicas, estado actual y hoja de ruta). **Prevalecen
+   sobre esta skill** si hay discrepancia, porque se actualizan en cada sesión.
+3. Revisar las últimas entradas de `repo/CHANGELOG.md` para saber dónde se quedó.
+
+Estructura:
+
+```
+CALCULADORA CLAUDE/
+├── CLAUDE.md      reglas del espacio de trabajo (privado)
+├── apuntes/       material de asignaturas que aporta Antonio (privado, nunca al repo)
+├── ejecutables/   .exe compilados (fuera de git)
+└── repo/          git PÚBLICO: github.com/teerueel/Calculadora-Supervivencia
+    ├── CLAUDE.md, CHANGELOG.md, README.md
+    ├── python/    escritorio (PySide6) y motor Python
+    ├── web/       React + esbuild; HTML autocontenido
+    ├── index.html copia del HTML para GitHub Pages
+    └── docs/      SKILL.md (copia de esta skill)
+```
+
+Reglas:
+
+- Todo lo nuevo se guarda en esa carpeta: código y documentación en `repo/`, material de
+  clase en `apuntes/<asignatura>/`, el `.exe` en `ejecutables/`.
+- El repo es público: no copiar apuntes, enunciados ni material de terceros dentro de él.
+  Lo que se incorpore de una asignatura entra reescrito y se anota en la sección
+  "Incorporaciones desde asignaturas" de `repo/CLAUDE.md`.
+- Al cerrar una sesión con cambios: entrada en `CHANGELOG.md`, actualizar `repo/CLAUDE.md`
+  si cambia el estado o una decisión, y commit. **Push solo cuando Antonio lo pida.**
+- Si se recompila la web, copiar el HTML a `index.html` para GitHub Pages.
 
 ## Cuándo usar esta skill
 
@@ -24,8 +62,8 @@ supervivencia y fallecimiento basada en tablas de mortalidad españolas.
 **Construir $l_x$ una sola vez y leer posiciones.** Toda probabilidad de este tipo es un
 cociente de valores de la función de supervivencia; resolverlas con productorios
 $\prod_{k=0}^{n-1}(1-q_{x+k})$ es más lento, acumula error numérico y no permite reutilizar
-el vector para la curva ni para la tabla. La tabla $l_x$ es además lo que el enunciado
-académico espera ver.
+el vector para la curva ni para la tabla. Además deja cada resultado trazable a una
+única función de supervivencia, que es lo que se revisa en un uso profesional.
 
 ## Procedimiento
 
@@ -205,11 +243,42 @@ parámetros de los modelos se editan **dentro de la pestaña de comparación** (
 se despliega y tiene sus propios parámetros); obligar a cambiar de pestaña para ajustarlos
 es incómodo.
 
-### 11. Implementaciones
+### 11. Rentas actuariales
+
+Notación: $I$ efectivo anual constante, $v=(1+I)^{-1}$ y cada plazo $1/m$ se
+descuenta con $v^{1/m}$. **$C$ es siempre la cuantía anual**: si se paga $c$ por plazo, $C=m\,c$.
+$w=120$ y, en la vitalicia, $n=w+1-x-k$ (se calcula automáticamente).
+
+$$a^{(m)}_{\overline{t}|}=\sum_{i=1}^{mt}\frac{v^{i/m}}{m},\qquad
+\ddot a^{(m)}_{\overline{t}|}=\sum_{i=1}^{mt}\frac{v^{(i-1)/m}}{m},\qquad
+{}_{k|}a^{(m)}_{\overline{t}|}=v^k a^{(m)}_{\overline{t}|}$$
+
+La v.a. se denota con el propio símbolo de la renta. Con $N=mn$ plazos:
+
+| Prepagable ${}_{k\mid}\ddot a^{(m)}_{x:\overline{n}|}$ | Postpagable ${}_{k\mid}a^{(m)}_{x:\overline{n}|}$ |
+|---|---|
+| $0$ con ${}_kq_x$ (solo si $k>0$) | $0$ con ${}_{k+1/m}q_x$ |
+| ${}_{k\mid}\ddot a^{(m)}_{\overline{j/m}|}$ con ${}_{k+\frac{j-1}{m}\mid\frac1m}q_x$, $j=1\dots N$ | ${}_{k\mid}a^{(m)}_{\overline{j/m}|}$ con ${}_{k+\frac{j}{m}\mid\frac1m}q_x$, $j=1\dots N-1$ |
+| al último valor se le suma ${}_{k+n}p_x$ (temporal) | ${}_{k\mid}a^{(m)}_{\overline{n}|}$ con ${}_{k+n}p_x$ (temporal) |
+
+En la vitalicia no hay término de supervivencia (${}_{w+1-x}p_x=0$): la postpagable termina en
+$a_{\overline{n-1/m}|}$.
+
+- Probabilidades leídas de $l$: ${}_{t\mid h}q_x=(l_{x+t}-l_{x+t+h})/l_x$. $x$ entera; $n$ y $k$
+  múltiplos de $1/m$; las edades $x+j/m$ usan interpolación lineal (UDD) fija.
+- Momentos de los órdenes que elija el usuario: $E[Y^s]=\sum \text{valor}^s\cdot\text{prob}$ (en €$^s$).
+- Métricas: media (prima pura única), varianza, $\sigma$, coeficiente de variación, asimetría y
+  curtosis (momentos centrales a partir de los ordinarios), cuantiles $Q(a)=\min\{y:F(y)\ge a\}$,
+  VaR 99,5 % y TVaR 99,5 % $=\frac{1}{1-a}\int_a^1 Q(u)\,du$.
+- Presentación: símbolo con $(m)$ y el subíndice apilados y el ángulo actuarial; en la tabla de
+  la distribución, plazos en forma fraccionaria (`47+1/12`, no decimales).
+- Control: la suma de probabilidades es 1 y $E[Y]$ coincide con el cálculo pago a pago.
+
+### 12. Implementaciones
 
 - **Artifact web**: React + recharts, un único HTML autocontenido (bundle con esbuild).
 - **Escritorio**: Python con PySide6 + matplotlib; motor separado de la interfaz
-  (`datos.py`, `tablas.py`, `modelos.py`) y .exe con PyInstaller (`calculadora.spec`).
+  (`datos.py`, `tablas.py`, `modelos.py`, `rentas.py`) y .exe con PyInstaller (`calculadora.spec`).
 - Ambos motores deben dar el mismo resultado (tolerancia $10^{-8}$): al cambiar uno,
   cambiar el otro y comparar.
 
