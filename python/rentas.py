@@ -1,7 +1,7 @@
 """
 Rentas actuariales: distribución, momentos de orden s y métricas derivadas.
 
-Notación de la asignatura (apuntes de Seguros de Vida):
+Notación:
   · I = tipo efectivo anual, constante;  v = (1 + I)^(−1);  el plazo 1/m se descuenta con v^(1/m).
   · C = cuantía ANUAL. Si se paga c en cada plazo, C = m · c y cada pago vale C/m.
   · Rentas financieras unitarias (C = 1):
@@ -27,11 +27,11 @@ Las edades x + t no enteras (t múltiplo de 1/m) usan l interpolada linealmente 
 """
 import math
 
+import descuento
 import tablas
+from distribucion import PCTS, ALPHA, momentos, cuantil, tvar, metricas, prima  # noqa: F401  (reexportados)
 
-W = 120  # edad máxima de la asignatura (ω = w + 1 = 121, l_121 = 0)
-PCTS = (0.05, 0.25, 0.50, 0.75, 0.95, 0.995)
-ALPHA = 0.995  # nivel de Solvencia II
+W = 120  # edad máxima (ω = w + 1 = 121, l_121 = 0)
 
 
 def _is_mult(v, m):
@@ -49,8 +49,9 @@ def validar(x, n, m, k, I, c, vitalicia, need_year=False, year=None):
         return f"El horizonte n debe ser > 0 y múltiplo de 1/{m}."
     if vitalicia and round(x) + k >= W + 1:
         return "Con este diferimiento nadie llega a cobrar: x + k debe ser menor que w + 1 = 121."
-    if not math.isfinite(I) or I <= -1:
-        return "El tipo de interés I debe ser mayor que −100 %."
+    e = descuento.validar_interes(I)
+    if e:
+        return e
     if not math.isfinite(c) or c <= 0:
         return "La cuantía de cada plazo debe ser positiva."
     if need_year and (not math.isfinite(year) or abs(year - round(year)) > 1e-9 or year < 1900 or year > 2200):
@@ -89,15 +90,16 @@ def distribucion(l, x, n, m, k, I, c, pre, vitalicia):
     n = N / m
     C = m * c
     v = 1.0 / (1.0 + I)
-    vk = v ** (K / m)
+    vt = descuento.factor(I)          # capa de descuento: v(t) = v^t
+    vk = vt(K / m)
     L = lambda p: tablas.l_at(l, x + p / m, "lin")  # noqa: E731  (p en plazos de 1/m desde x)
     lx = L(0)
 
     # Rentas financieras unitarias acumuladas: A[j] = a^(m)_{j/m⌉}, AA[j] = ä^(m)_{j/m⌉}
     A, AA = [0.0], [0.0]
     for i in range(1, N + 1):
-        A.append(A[-1] + v ** (i / m) / m)
-        AA.append(AA[-1] + v ** ((i - 1) / m) / m)
+        A.append(A[-1] + vt(i / m) / m)
+        AA.append(AA[-1] + vt((i - 1) / m) / m)
 
     rows = []
 
@@ -127,46 +129,7 @@ def distribucion(l, x, n, m, k, I, c, pre, vitalicia):
                 prob_total=sum(r["prob"] for r in rows), p_completa=fin if not vitalicia else 0.0)
 
 
-def momentos(rows, ordenes):
-    """E[Y^s] = Σ valor^s · prob  para cada orden s pedido (en euros^s)."""
-    return {s: sum(r["val"] ** s * r["prob"] for r in rows) for s in ordenes}
-
-
-def cuantil(rows, a):
-    """Q(a) = mín { y : F(y) ≥ a }  (distribución discreta)."""
-    F = 0.0
-    for r in rows:
-        F += r["prob"]
-        if F >= a - 1e-12:
-            return r["val"]
-    return rows[-1]["val"]
-
-
-def tvar(rows, a):
-    """TVaR_a = (1/(1−a)) ∫_a^1 Q(u) du  (válida también con átomos)."""
-    F0, tot = 0.0, 0.0
-    for r in rows:
-        F1 = F0 + r["prob"]
-        tot += r["val"] * max(0.0, F1 - max(F0, a))
-        F0 = F1
-    return tot / (1 - a)
-
-
-def metricas(rows):
-    m1, m2, m3, m4 = (momentos(rows, (1, 2, 3, 4))[s] for s in (1, 2, 3, 4))
-    var = max(0.0, m2 - m1 ** 2)
-    sd = math.sqrt(var)
-    # momentos centrales a partir de los ordinarios
-    mu3 = m3 - 3 * m1 * m2 + 2 * m1 ** 3
-    mu4 = m4 - 4 * m1 * m3 + 6 * m1 ** 2 * m2 - 3 * m1 ** 4
-    return dict(media=m1, var=var, sd=sd, cv=sd / m1 if m1 > 0 else float("nan"),
-                asim=mu3 / sd ** 3 if sd > 0 else float("nan"),
-                curt=mu4 / sd ** 4 if sd > 0 else float("nan"),
-                cuantiles={a: cuantil(rows, a) for a in PCTS},
-                var995=cuantil(rows, ALPHA), tvar995=tvar(rows, ALPHA))
-
-
-def calcular(key, sex, year, x, n, m, k, I, c, pre, vitalicia, ordenes=(1, 2)):
+def calcular(key, sex, year, x, n, m, k, I, c, pre, vitalicia, ordenes=(1, 2), alpha=0.0):
     e = validar_tabla(key, sex, year, x)
     if e:
         raise ValueError(e)
@@ -174,5 +137,6 @@ def calcular(key, sex, year, x, n, m, k, I, c, pre, vitalicia, ordenes=(1, 2)):
     D = distribucion(l, x, n, m, k, I, c, pre, vitalicia)
     D["momentos"] = momentos(D["rows"], ordenes)
     D["metricas"] = metricas(D["rows"])
+    D["prima"] = prima(D["metricas"]["media"], alpha)
     D["cohort"] = cohort if tablas.is_per(key) else None
     return D

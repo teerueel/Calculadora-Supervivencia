@@ -2,6 +2,35 @@
 
 Entradas de la más reciente a la más antigua. Cada sesión de trabajo con cambios añade una.
 
+## 2026-10-07: Fase 2 · Seguros de vida, interés técnico y recargo de seguridad
+
+- Nueva pestaña **Seguros de vida** (web y escritorio): temporal a n años, vida entera,
+  capital diferido y mixto, diferidos m años (salvo el capital diferido), con pago al final
+  del año de fallecimiento. El mixto admite capital de fallecimiento C_f y de supervivencia C_s
+  distintos y muestra por separado sus dos partes. Distribución del valor actual Z (valores
+  iguales agrupados, ordenada por valor), momentos de orden s, prima pura única, métricas de
+  riesgo (VaR y TVaR 99,5 %) y funciones de masa y distribución. Base técnica verificada por
+  Antonio antes de programar (apuntes 8–9 de Seguros de Vida).
+- **Rentas y seguros:** interés por defecto 1,95 %, tipo técnico DGSFP 2026
+  (BOE-A-2026-1226), editable y con botón para volver a él; **recargo de seguridad α** libre
+  con prima pura, importe del recargo y prima recargada (1 + α)·E.
+- Motor reorganizado en capas: `descuento.py`/`.js` (v(t), tipo técnico), `distribucion.py`/`.js`
+  (agregación, momentos, métricas, prima) y los productos `rentas` y `seguros`.
+  En la web, piezas comunes de las dos pestañas en `comun.jsx`; en escritorio, clase `DistTab`.
+- **Corrección destapada por la paridad:** varianza, asimetría y curtosis se calculan con
+  momentos centrales directos. Con la fórmula a partir de los ordinarios, distribuciones casi
+  degeneradas (vida entera con I = 0) daban asimetrías de ~10⁸ distintas en Python y en JS.
+  Afecta a rentas en el último decimal; la diferencia Python/JS baja de ~10⁻¹¹ a ≤ 5·10⁻¹⁴.
+- Tests: `test_seguros.py` y `seguros.test.mjs` (Σ prob = 1, conmutación, Aₓ = 1 − d·äₓ,
+  descomposiciones, ²A, recargo, validación) y seguros en la prueba de paridad.
+  383 tests en Python y 181 en JS.
+- `docs/NOTA_TECNICA.md` v1.2 (§9 Seguros de vida, §10 Descuento, interés técnico y prima
+  recargada; secciones 9–11 renumeradas como 11–13). `CLAUDE.md`: §2.2, §2.3, estado, fase 2
+  en curso con sus decisiones, §8 y nuevo paso obligatorio en §6.1: **verificación de la base
+  técnica por Antonio antes de programar**. README y `docs/SKILL.md` actualizados.
+- Pendiente de la fase 2: función de densidad de la vida residual (aplazada).
+- HTML autocontenido e `index.html` recompilados.
+
 ## 2026-10-07: Fase 1 · Base de calidad (tests automáticos)
 
 - Nueva carpeta `tests/` con la batería automática y un script único,

@@ -55,3 +55,23 @@ def cerca(a, b, tol):
     if na or nb:
         return na and nb
     return abs(a - b) <= tol * max(1.0, abs(a), abs(b))
+
+
+COMBOS_SEGUROS = COMBOS_RENTAS
+
+
+def casos_seguros(combos=COMBOS_SEGUROS):
+    """(tabla, sexo, año, tipo, x, n, m, I, C_f, C_s) válidos según seguros.validar y
+    seguros.validar_tabla (l_x > 0)."""
+    import seguros
+    for (key, sex), tipo, x, n, m, I, (Cf, Cs) in itertools.product(
+            combos, seguros.TIPOS, (0, 40, 65, 100, 108, 119, 120), (1, 10, 35), (0, 3, 20),
+            (0.0, 0.0195, 0.05), ((1.0, 1.0), (1000.0, 2500.0))):
+        if tipo == "vida_entera" and n != 1:          # n no interviene
+            continue
+        if tipo == "capital_diferido" and m != 0:     # sin diferimiento
+            continue
+        if tipo != "mixto" and (Cf, Cs) != (1.0, 1.0):  # dos capitales solo en el mixto
+            continue
+        if seguros.validar(tipo, x, n, m, I, Cf, Cs) is None and seguros.validar_tabla(key, sex, 2026, x) is None:
+            yield key, sex, 2026, tipo, x, n, m, I, Cf, Cs

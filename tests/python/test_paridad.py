@@ -13,9 +13,11 @@ import pytest
 
 import modelos
 import rentas
+import seguros
 import tablas
+import distribucion
 from casos import (RAIZ_REPO, TABLAS, SEXOS, METODOS, MODELOS, EDADES, PLAZOS, DIFERIMIENTOS,
-                   TOL_PARIDAD, casos_tablas, casos_rentas, cerca)
+                   TOL_PARIDAD, casos_tablas, casos_rentas, casos_seguros, cerca)
 from datos import TABLES
 
 VALIDAR = [
@@ -33,6 +35,23 @@ VALIDAR = [
     (30, 10, 1, 0, 0.02, 1, False, True, 2026.5),
 ]
 VALIDAR_TABLA = [(k, s, 2026, x) for k in TABLAS for s in SEXOS for x in (0, 104, 109, 110, 111, 112, 119, 120)]
+VALIDAR_SEGUROS = [
+    ("temporal", 30, 10, 0, 0.02, 1, 1, False, 2026),
+    ("otro", 30, 10, 0, 0.02, 1, 1, False, 2026),
+    ("temporal", 30.5, 10, 0, 0.02, 1, 1, False, 2026),
+    ("temporal", 121, 10, 0, 0.02, 1, 1, False, 2026),
+    ("temporal", 30, 0, 0, 0.02, 1, 1, False, 2026),
+    ("mixto", 30, 2.5, 0, 0.02, 1, 1, False, 2026),
+    ("temporal", 30, 10, 1.5, 0.02, 1, 1, False, 2026),
+    ("vida_entera", 100, 0, 21, 0.02, 1, 1, False, 2026),
+    ("vida_entera", 30, 0.5, 0, 0.02, 1, 0, False, 2026),
+    ("capital_diferido", 30, 10, 7.5, 0.02, 0, 1, False, 2026),
+    ("temporal", 30, 10, 0, -1, 1, 1, False, 2026),
+    ("temporal", 30, 10, 0, 0.02, 0, 1, False, 2026),
+    ("capital_diferido", 30, 10, 0, 0.02, 1, 0, False, 2026),
+    ("temporal", 30, 10, 0, 0.02, 1, 1, True, 1800),
+]
+RECARGOS = [0.0, 0.05, -0.01, -1e-12, 1.5]
 FRAC = [(p, m) for m in (1, 2, 4, 12) for p in (0, 1, 5, 12, 13, 47, 100)]
 
 
@@ -47,6 +66,8 @@ def preparar_casos():
         modelos=[(k, s, met, x, n, m) for k, s, met in itertools.product(MODELOS, SEXOS, METODOS)
                  for x, n, m in itertools.product(EDADES, PLAZOS, DIFERIMIENTOS)],
         rentas=list(casos_rentas())[::4],
+        seguros=list(casos_seguros())[::3],
+        validarSeguros=VALIDAR_SEGUROS, recargos=RECARGOS,
         validar=VALIDAR, validarTabla=VALIDAR_TABLA, frac=FRAC,
     )
 
@@ -135,11 +156,24 @@ def test_modelos(casos, js):
 def test_rentas(casos, js):
     fallos = []
     for c, r in zip(casos["rentas"], js["rentas"]):
-        D = rentas.calcular(*c, ordenes=(1, 2, 3, 4))
+        D = rentas.calcular(*c, ordenes=(1, 2, 3, 4), alpha=0.07)
         py = dict(rows=[[f["pagos"], f["val"], f["prob"]] for f in D["rows"]], momentos=D["momentos"],
-                  metricas=D["metricas"], N=D["N"], n=D["n"], k=D["k"], cohort=D["cohort"])
+                  metricas=D["metricas"], prima=D["prima"], N=D["N"], n=D["n"], k=D["k"], cohort=D["cohort"])
         comparar(str(c), py, r, fallos)
     assert len(js["rentas"]) > 50
+    assert not fallos, fallos[:5]
+
+
+def test_seguros(casos, js):
+    fallos = []
+    for c, r in zip(casos["seguros"], js["seguros"]):
+        D = seguros.calcular(*c, ordenes=(1, 2, 3, 4), alpha=0.07)
+        py = dict(rows=[[f["val"], f["prob"], [[e["t"], e["cap"], [list(t) for t in e["psym"]]] for e in f["eventos"]]]
+                        for f in D["rows"]],
+                  momentos=D["momentos"], metricas=D["metricas"], prima=D["prima"], componentes=D["componentes"],
+                  pPago=D["p_pago"], n=D["n"], m=D["m"], cohort=D["cohort"])
+        comparar(str(c), py, r, fallos)
+    assert len(js["seguros"]) > 100
     assert not fallos, fallos[:5]
 
 
@@ -148,3 +182,5 @@ def test_validaciones_y_formato(casos, js):
     assert py == js["validar"]
     assert [rentas.validar_tabla(*a) for a in casos["validarTabla"]] == js["validarTabla"]
     assert [rentas.frac(p, m) for p, m in casos["frac"]] == js["frac"]
+    assert [seguros.validar(*a) for a in casos["validarSeguros"]] == js["validarSeguros"]
+    assert [distribucion.validar_recargo(a) for a in casos["recargos"]] == js["recargos"]

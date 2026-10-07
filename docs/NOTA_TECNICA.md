@@ -5,22 +5,22 @@ controles. Describe lo que está **implementado**, no lo planificado.
 
 | | |
 | --- | --- |
-| Versión de la nota | 1.1 |
+| Versión de la nota | 1.2 |
 | Fecha | 7 de octubre de 2026 |
-| Estado del producto | Tablas, modelos paramétricos, comparación, rentas actuariales y atlas |
+| Estado del producto | Tablas, modelos paramétricos, comparación, rentas actuariales, seguros de vida y atlas |
 | Implementaciones | Python (`python/`) y JavaScript (`web/src/`), numéricamente equivalentes |
 
 > **Mantenimiento.** Esta nota se actualiza en el mismo commit que cualquier cambio que
 > altere un cálculo, añada una magnitud o cambie una hipótesis. Cada actualización sube la
-> versión y deja una línea en el §11.
+> versión y deja una línea en el §13.
 
 * * *
 
 ## 1. Alcance y principios
 
 La calculadora obtiene probabilidades de supervivencia y fallecimiento, esperanzas de vida y
-la distribución completa del valor actual de rentas actuariales, sobre una cabeza, a partir
-de tablas de mortalidad oficiales españolas o de leyes paramétricas.
+la distribución completa del valor actual de rentas actuariales y de seguros de vida, sobre
+una cabeza, a partir de tablas de mortalidad oficiales españolas o de leyes paramétricas.
 
 Tres principios rigen todos los cálculos:
 
@@ -34,7 +34,8 @@ Tres principios rigen todos los cálculos:
 
 **Notación.** Actuarial internacional: $_n p_x$, $_n q_x$, $_{m\mid n} q_x$, $e_x$,
 $\mathring e_x$, $\mu_x$; rentas $_{k\mid}\ddot a^{(m)}_{x:\overline{n}|}$ y
-$_{k\mid}a^{(m)}_{x:\overline{n}|}$.
+$_{k\mid}a^{(m)}_{x:\overline{n}|}$; seguros $_{m\mid}A^1_{x:\overline{n}|}$, $_{m\mid}A_x$,
+$A_{x:\overline{n}|}^{\;\;1} = {}_nE_x$ y $_{m\mid}A_{x:\overline{n}|}$.
 
 ## 2. Fuentes de datos
 
@@ -230,8 +231,9 @@ $\omega = 121$ porque su ajuste diverge. La interfaz lo indica.
 
 Renta sobre una cabeza de edad $x$ entera, con $m$ pagos al año, diferimiento $k$, duración
 $n$ (temporal) o vitalicia, prepagable o postpagable. Cuantía por plazo $c$ y cuantía
-anual $C = m\,c$. Tipo efectivo anual constante $I$, $v = (1+I)^{-1}$; cada plazo $1/m$ se
-descuenta con $v^{1/m}$. Edad máxima $w = 120$; en la vitalicia $n = w + 1 - x - k$.
+anual $C = m\,c$. Tipo efectivo anual constante $I$ (por defecto, el tipo técnico del §10.2),
+$v = (1+I)^{-1}$; cada plazo $1/m$ se descuenta con $v^{1/m}$. Edad máxima $w = 120$; en la
+vitalicia $n = w + 1 - x - k$.
 
 Se exige $n$ y $k$ múltiplos de $1/m$, $c > 0$, $I > -1$, $l_x > 0$ con la tabla elegida
 (si nadie llega a la edad $x$ se muestra un error, no un resultado) y, en la vitalicia,
@@ -264,12 +266,16 @@ catálogo; los modelos paramétricos no intervienen.
 
 - Momentos ordinarios de los órdenes elegidos: $E[Y^s] = \sum_i y_i^{\,s}\,p_i$ (en €$^s$).
 - Media $E[Y]$, que es la prima pura única.
-- Varianza $\sigma^2 = E[Y^2] - E[Y]^2$, desviación típica $\sigma$ y coeficiente de
-  variación $\sigma/E[Y]$.
-- Asimetría $\mu_3/\sigma^3$ y curtosis $\mu_4/\sigma^4$, con los momentos centrales
-  obtenidos de los ordinarios:
-  $\mu_3 = E[Y^3] - 3E[Y]E[Y^2] + 2E[Y]^3$,
-  $\mu_4 = E[Y^4] - 4E[Y]E[Y^3] + 6E[Y]^2E[Y^2] - 3E[Y]^4$.
+- Varianza $\sigma^2 = E[(Y - E[Y])^2]$ $(= E[Y^2] - E[Y]^2)$, desviación típica $\sigma$ y
+  coeficiente de variación $\sigma/E[Y]$.
+- Prima recargada $(1+\alpha)\,E[Y]$ con el recargo de seguridad $\alpha$ del §10.3.
+- Momentos centrales calculados directamente sobre la distribución,
+  $\mu_r = \sum_i (y_i - E[Y])^r\,p_i$ para $r = 2, 3, 4$ (con $\sigma^2 = \mu_2$). Es
+  algebraicamente igual a obtenerlos de los ordinarios, pero evita la cancelación de
+  $E[Y^2] - E[Y]^2$ cuando la distribución está muy concentrada (§10.4).
+- Asimetría $\mu_3/\sigma^3$ y curtosis $\mu_4/\sigma^4$. Si
+  $\sigma \le 10^{-12}\max(1, |E[Y]|)$ la distribución se considera degenerada: $\sigma = 0$
+  y asimetría y curtosis no se definen.
 - Cuantiles $Q(a) = \min\{y : F(y) \ge a\}$ para $a \in \{0{,}05;\ 0{,}25;\ 0{,}5;\ 0{,}75;\
   0{,}95;\ 0{,}995\}$.
 - $\text{VaR}_{99{,}5\%} = Q(0{,}995)$ y
@@ -280,7 +286,7 @@ catálogo; los modelos paramétricos no intervienen.
 logarítmica) y función de distribución $F(y)$ escalonada, ambas con marcas en $E[Y]$ y en
 $\text{VaR}_{99{,}5\%}$.
 
-**Comprobaciones** (automatizadas, §9): la suma de las probabilidades es 1 (el motor la
+**Comprobaciones** (automatizadas, §11): la suma de las probabilidades es 1 (el motor la
 devuelve con cada cálculo) y $E[Y]$ coincide con la valoración pago a pago,
 
 $${}_{k\mid}\ddot a^{(m)}_{x:\overline{n}|} = \sum_{j=0}^{N-1} \frac{v^{k+j/m}}{m}\,{}_{k+j/m}p_x,\qquad
@@ -288,18 +294,137 @@ $${}_{k\mid}\ddot a^{(m)}_{x:\overline{n}|} = \sum_{j=0}^{N-1} \frac{v^{k+j/m}}{
 
 multiplicada por $C$.
 
-## 9. Implementación y equivalencia numérica
+## 9. Seguros de vida
+
+### 9.1 Planteamiento
+
+Seguros sobre una cabeza de edad $x$ entera, con duración $n$ y diferimiento $m$ en años
+enteros. El capital de fallecimiento $C_f$ se paga **al final del año de fallecimiento**; el
+de supervivencia $C_s$, en la fecha de vencimiento si $(x)$ vive. Descuento
+$v(t) = (1+I)^{-t}$ (§10.1); edad máxima $w = 120$. Como todas las edades son enteras, las
+probabilidades se leen de $l$ sin interpolar:
+
+$$_{t\mid}q_x = \frac{l_{x+t} - l_{x+t+1}}{l_x},\qquad
+{}_t q_x = 1 - \frac{l_{x+t}}{l_x},\qquad {}_t p_x = \frac{l_{x+t}}{l_x}.$$
+
+Se exige $n \ge 1$ entero (temporal, capital diferido, mixto), $m \ge 0$ entero (temporal,
+vida entera, mixto), capitales positivos, $I > -1$ y $l_x > 0$; en la vida entera,
+$x + m < w + 1$. Los modelos paramétricos no intervienen: se valoran sobre las tablas del
+catálogo.
+
+### 9.2 Distribución del valor actual
+
+El valor actual de la prestación es una variable aleatoria discreta $Z$:
+
+| Contrato | Valores de $Z$ y probabilidades |
+| --- | --- |
+| Temporal $n$ años, diferido $m$: $_{m\mid}A^1_{x:\overline{n}|}$ | $C_f\,v^{m+i}$ con $_{m+i-1\mid}q_x$, $i = 1,\dots,n$; $0$ con $_m q_x + {}_{m+n}p_x$ |
+| Vida entera, diferido $m$: $_{m\mid}A_x$ | igual que el temporal con $n = w + 1 - x - m$; $0$ con $_m q_x$ (solo si $m > 0$) |
+| Capital diferido $n$ años: $A_{x:\overline{n}|}^{\;\;1} = {}_nE_x$ | $C_s\,v^n$ con $_n p_x$; $0$ con $_n q_x$ (sin diferimiento) |
+| Mixto $n$ años, diferido $m$: $_{m\mid}A_{x:\overline{n}|}$ | $0$ con $_m q_x$ (si $m > 0$); $C_f\,v^{m+i}$ con $_{m+i-1\mid}q_x$, $i = 1,\dots,n$; $C_s\,v^{m+n}$ con $_{m+n}p_x$ |
+
+En el mixto, el capital de supervivencia se paga en $t = m + n$, si $(x)$ vive al final de
+todo el periodo, y la prima pura se descompone en
+
+$$E[Z] = C_f\;{}_{m\mid}A^1_{x:\overline{n}|} + C_s\;{}_{m+n}E_x ,$$
+
+partes que la interfaz muestra por separado. En la vida entera,
+$_{w-x\mid}q_x = l_w/l_x$ cierra la partición porque $l_{w+1} = 0$.
+
+**Agregación.** Los valores iguales (con $|\Delta| \le 10^{-12}\max(1, |z|)$) se agrupan
+sumando sus probabilidades, y la distribución se ordena por valor creciente para obtener
+$F(z)$, cuantiles, VaR y TVaR. En los seguros de fallecimiento los valores **decrecen** con
+el año de pago, así que el orden por valor no coincide con el cronológico. Con $C_f = C_s$ y
+$m = 0$, el último valor del mixto es $C\,v^n$ con probabilidad
+$_{n-1\mid}q_x + {}_n p_x = {}_{n-1}p_x$; con $I = 0$, todos los pagos por fallecimiento
+valen $C$. En la tabla de la distribución, los tramos de tres o más años consecutivos
+agrupados se escriben $\sum_{j=a}^{a+k-1}{}_{j\mid}q_x = {}_{a\mid k}q_x$.
+
+### 9.3 Momentos, métricas y prima
+
+Los mismos que en rentas (§8.3) sobre la distribución agregada: $E[Z^s] = \sum_i z_i^{\,s}\,p_i$,
+prima pura única $E[Z]$, varianza, desviación, coeficiente de variación, asimetría, curtosis,
+cuantiles, $\text{VaR}_{99{,}5\%}$ y $\text{TVaR}_{99{,}5\%}$, y prima recargada
+$(1+\alpha)\,E[Z]$ (§10.3). Se muestra además la probabilidad de que se pague algún capital,
+$1 - P(Z = 0)$ con el átomo en 0 de los casos sin pago.
+
+**Gráficas.** Función de masa $P(Z = z)$ (escala de probabilidad lineal o logarítmica) y
+función de distribución $F(z)$ escalonada, con marcas en $E[Z]$ y $\text{VaR}_{99{,}5\%}$.
+
+### 9.4 Comprobaciones
+
+Automatizadas (§11), en rejillas de tablas, sexos, contratos, edades, duraciones,
+diferimientos, tipos y capitales:
+
+- probabilidades $\ge 0$ que suman 1 y valores agregados estrictamente crecientes;
+- $E[Z]$ igual a la prima calculada con **funciones de conmutación**, independiente de la
+  distribución: $D_y = v^y l_y$, $C_y = v^{y+1}(l_y - l_{y+1})$, $M_y = \sum_{z \ge y} C_z$ y
+  $_{m\mid}A^1_{x:\overline{n}|} = (M_{x+m} - M_{x+m+n})/D_x$,
+  $_{m\mid}A_x = M_{x+m}/D_x$, $_nE_x = D_{x+n}/D_x$;
+- relación con las rentas, con $d = 1 - v$: $A_x = 1 - d\,\ddot a_x$ y
+  $A_{x:\overline{n}|} = 1 - d\,\ddot a_{x:\overline{n}|}$;
+- descomposiciones $A_x = A^1_{x:\overline{n}|} + {}_{n\mid}A_x$,
+  $A_{x:\overline{n}|} = A^1_{x:\overline{n}|} + {}_nE_x$ y
+  $_{m\mid}A_{x:\overline{n}|} = {}_{m\mid}A^1_{x:\overline{n}|} + {}_{m+n}E_x$;
+- segundo momento de capital unitario igual a la prima al tipo $(1+I)^2 - 1$ (${}^2A$);
+- componentes del mixto que suman $E[Z]$, prima recargada y validación de parámetros.
+
+Todas con tolerancia $10^{-12}$.
+
+## 10. Descuento, interés técnico y prima recargada
+
+### 10.1 Capa de descuento
+
+Rentas y seguros solo piden a esta capa los factores de descuento:
+$v = (1+I)^{-1}$, $v(t) = v^t$, con $I$ efectivo anual constante y $I > -1$
+(`descuento.py` / `descuento.js`). Una curva de tipos sustituiría esta función sin tocar los
+productos.
+
+### 10.2 Tipo de interés técnico por defecto
+
+En rentas y seguros, el interés por defecto es **1,95 %**, el tipo de interés máximo fijado
+por la DGSFP para el cálculo contable de la provisión de seguros de vida en 2026
+(Resolución de 9 de enero de 2026, BOE núm. 16, de 19 de enero,
+[BOE-A-2026-1226](https://www.boe.es/buscar/doc.php?id=BOE-A-2026-1226)), en aplicación del
+art. 33 del ROSSP (RD 2486/1998). La resolución lo fija como máximo para las provisiones de
+los contratos celebrados antes del 1 de enero de 2016; la calculadora lo ofrece como **valor
+de referencia** editable, con año y referencia visibles. Se actualiza cada enero.
+
+### 10.3 Recargo de seguridad
+
+El usuario fija libremente un recargo $\alpha \ge 0$, en tanto por ciento, sobre la prima
+pura única. Se muestran
+
+$$\text{prima pura} = E[Z],\qquad \text{recargo} = \alpha\,E[Z],\qquad
+\text{prima recargada} = (1+\alpha)\,E[Z],$$
+
+igual en rentas ($Y$) y en seguros ($Z$). La calculadora no impone ningún principio de
+cálculo de primas.
+
+### 10.4 Estabilidad numérica de los momentos centrales
+
+Desde la versión 1.2, varianza, asimetría y curtosis se calculan con los momentos centrales
+directos del §8.3. Con la fórmula a partir de los ordinarios, distribuciones casi
+degeneradas (p. ej. vida entera con $I = 0$, donde $Z = C$ con certeza, o mixtos con
+$P(\text{supervivencia}) \approx 1$) daban un $\sigma$ residual de redondeo y una asimetría del
+orden de $10^8$, distinta en Python y en JS.
+
+## 11. Implementación y equivalencia numérica
 
 | Capa | Python | JavaScript |
 | --- | --- | --- |
 | Datos y catálogo | `datos.py` | `data.js` |
 | Tablas y modelos | `tablas.py`, `modelos.py` | `engine.js` |
 | Rentas | `rentas.py` | `rentas.js` |
+| Seguros | `seguros.py` | `seguros.js` |
+| Distribución del valor actual y prima | `distribucion.py` | `distribucion.js` |
+| Descuento | `descuento.py` | `descuento.js` |
 
 Los dos motores deben coincidir con tolerancia $10^{-8}$ (relativa si el valor supera 1).
 Todo cambio de cálculo se hace en ambos. Diferencias máximas medidas por la prueba de
 paridad: 0 en los datos y valores iniciales; $\sim 10^{-15}$ en $q$, $l$, probabilidades,
-esperanzas y $\mu$ (tablas y modelos); $\sim 10^{-11}$ en rentas (momentos de orden alto).
+esperanzas y $\mu$ (tablas y modelos); $\le 5\cdot10^{-14}$ en rentas y seguros (momentos de
+orden alto incluidos).
 
 **Función $\Phi$ (Thiele).** Python usa `math.erf`. JavaScript no la trae, así que
 `engine.js` calcula $\operatorname{erfc}$ con precisión de doble: serie de Taylor de
@@ -322,9 +447,11 @@ hipótesis de interpolación, modelos y rentas:
 - rentas: probabilidades $\ge 0$ que suman 1, valores crecientes, $E[Y]$ igual a la
   valoración pago a pago (§8.3) con tolerancia $10^{-12}$, coherencia de varianza,
   cuantiles, VaR y TVaR, y validación de parámetros;
-- paridad Python/JS de todo lo anterior y de los mensajes de validación.
+- seguros: las comprobaciones del §9.4;
+- paridad Python/JS de todo lo anterior (incluidos la prima recargada y los eventos de cada
+  valor de los seguros) y de los mensajes de validación.
 
-## 10. Hipótesis y limitaciones
+## 12. Hipótesis y limitaciones
 
 - Los valores del BOE están redondeados: diferencias en el último decimal frente a otras
   implementaciones son esperadas.
@@ -333,11 +460,15 @@ hipótesis de interpolación, modelos y rentas:
 - $\omega = 121$ en todas las tablas y en Heligman–Pollard. En los modelos continuos,
   $l_x$ es positiva más allá de 121; las curvas se dibujan hasta 121.
 - Rentas: edad entera, tipo de interés constante, una sola cabeza, interpolación UDD fija.
+- Seguros: edad, duración y diferimiento enteros; pago al final del año de fallecimiento (sin
+  fraccionamiento del pago ni pago en el momento de la muerte); prima única (sin primas
+  periódicas ni reservas); tipo constante.
 - Todo se calcula sobre una cabeza; no hay aún estados de grupo.
 
-## 11. Historial de la nota
+## 13. Historial de la nota
 
 | Versión | Fecha | Cambio |
 | --- | --- | --- |
 | 1.0 | 2026-10-07 | Primera versión: tablas, modelos paramétricos, comparación y rentas actuariales. |
 | 1.1 | 2026-10-07 | Fase 1. PER2020 Individual de 1er orden tomada tal cual del anexo 2.1 (§3.3); tolerancias del cotejo con el BOE (§2); error en rentas si $l_x = 0$ (§8.1); $\operatorname{erfc}$ de precisión doble en JS y tests automáticos (§9). |
+| 1.2 | 2026-10-07 | Fase 2 (parte). Seguros de vida: temporal, vida entera, capital diferido y mixto con dos capitales, diferidos (§9). Capa de descuento, tipo técnico DGSFP 2026 por defecto y recargo de seguridad α en rentas y seguros (§10). Momentos centrales directos y distribución degenerada (§8.3, §10.4). Secciones 9–11 renumeradas como 11–13. |

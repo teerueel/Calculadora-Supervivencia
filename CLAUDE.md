@@ -78,6 +78,29 @@ CV, asimetría, curtosis, cuantiles, VaR y TVaR al 99,5 %. `x` entera; `n` y `k`
 de `1/m`; las edades `x + j/m` usan UDD. El detalle de valores y probabilidades de la
 prepagable y la postpagable está en el `README.md`.
 
+### 2\.2 Seguros de vida
+
+`x`, `n` y `m` enteros; capital de fallecimiento `C_f` al **final del año de fallecimiento**,
+de supervivencia `C_s` al vencimiento; probabilidades leídas de `l_x` sin interpolar. Valores
+de `Z` (nota técnica §9.2):
+
+- temporal `_{m|}A^1_{x:n}`: `C_f v^{m+i}` con `_{m+i-1|}q_x` (`i = 1..n`); 0 con `_m q_x + _{m+n} p_x`;
+- vida entera `_{m|}A_x`: igual con `n = w + 1 - x - m`; 0 con `_m q_x` si `m > 0`;
+- capital diferido `_nE_x`: `C_s v^n` con `_n p_x`; 0 con `_n q_x`; **sin diferimiento**;
+- mixto `_{m|}A_{x:n}`: muerte como el temporal y `C_s v^{m+n}` con `_{m+n} p_x`
+  (**supervivencia pagada en `m + n`**); **dos capitales** `C_f` y `C_s`.
+
+Valores iguales se agrupan y la distribución se ordena por valor antes de `F`, cuantiles,
+VaR y TVaR. Momentos y métricas como en rentas.
+
+### 2\.3 Descuento, interés técnico y recargo (rentas y seguros)
+
+- Capa de descuento `descuento.py`/`.js`: `v(t) = (1+I)^{-t}`. Los productos solo piden `v(t)`.
+- Interés por defecto: **tipo técnico DGSFP del año** (§7.3), editable, con referencia visible.
+- Recargo de seguridad `α ≥ 0` libre: recargo `α E[Z]`, prima recargada `(1+α) E[Z]`.
+- Momentos centrales **directos**, `Σ (z − E[Z])^r p`; `σ ≤ 10^{-12}·máx(1,|E|)` ⇒ distribución
+  degenerada (σ = 0, sin asimetría ni curtosis).
+
 ## 3\. Fuentes de datos
 
 Resolución de la DGSFP de 17 de diciembre de 2020, **BOE\-A\-2020\-17154**:
@@ -113,12 +136,15 @@ Dos implementaciones equivalentes, con el **motor separado de la interfaz**:
 | --- | --- | --- |
 | Datos y catálogo | `datos.py` | `data.js` |
 | Motor de tablas y modelos | `tablas.py`, `modelos.py` | `engine.js` |
-| Rentas | `rentas.py` | `rentas.js` |
-| Interfaz | `app.py` (PySide6 + matplotlib) | `App.jsx`, `rentas.jsx` (React + recharts) |
+| Descuento (capa 4) | `descuento.py` | `descuento.js` |
+| Distribución del valor actual y prima | `distribucion.py` | `distribucion.js` |
+| Rentas (producto) | `rentas.py` | `rentas.js` |
+| Seguros (producto) | `seguros.py` | `seguros.js` |
+| Interfaz | `app.py` (PySide6 + matplotlib) | `App.jsx`, `rentas.jsx`, `seguros.jsx`, `comun.jsx` (React + recharts) |
 | Atlas | `atlas.py` | `atlas.jsx` |
 
 - Los dos motores deben dar los mismos números (tolerancia `10^{-8}`; diferencia medida
-  ~10⁻¹⁵ en tablas y modelos, ~10⁻¹¹ en rentas). Todo cambio de cálculo se hace **en
+  ~10⁻¹⁵ en tablas y modelos, ≤ 5·10⁻¹⁴ en rentas y seguros). Todo cambio de cálculo se hace **en
   ambos**, y la prueba de paridad (`tests/python/test_paridad.py`) lo comprueba.
 - JS no tiene `Math.erf`: `engine.js` implementa `erfc` con precisión de doble (Taylor +
   fracción continua). No volver a aproximaciones de ~10⁻⁷.
@@ -156,7 +182,7 @@ Dos implementaciones equivalentes, con el **motor separado de la interfaz**:
 
 ## 6\. Estado actual
 
-Cinco pestañas, en web y escritorio:
+Seis pestañas, en web y escritorio:
 
 1. **Tablas de mortalidad**: nueve tablas (PER2020 Individual y Colectiva; PASEM2020
    General, Rel, NoRel y Decesos; 2º y 1er orden). `_n p_x`, `_n q_x`, `_{m\mid n} q_x`,
@@ -167,14 +193,18 @@ Cinco pestañas, en web y escritorio:
 3. **Comparación**: hasta 8 escenarios mixtos, cada uno con sexo y parámetros propios;
    modelos repetidos se numeran.
 4. **Rentas actuariales**: temporal o vitalicia, pre o postpagable, `m` pagos al año,
-   diferimiento `k`, interés `I`; distribución, momentos y métricas de riesgo (§2.1).
-5. **Atlas**: guía de modelos paramétricos y de tablas e hipótesis de interpolación.
+   diferimiento `k`, interés técnico `I` y recargo `α`; distribución, momentos, métricas de
+   riesgo y prima pura, recargo y prima recargada (§2.1, §2.3).
+5. **Seguros de vida**: temporal, vida entera, capital diferido y mixto (dos capitales),
+   diferidos salvo el capital diferido; mismos resultados que rentas más las partes de
+   fallecimiento y supervivencia del mixto (§2.2).
+6. **Atlas**: guía de modelos paramétricos y de tablas e hipótesis de interpolación.
 
 Gráficas en las tres primeras: `_t p_x`, `_t q_x` y `\mu_{x+t}` (log/lineal), con marca en
 `t=n` y franja `[m,m+n]`.
 
-**Base de calidad (fase 1, cerrada):** batería de tests automáticos en `tests/` (≈340 en
-Python con paridad incluida, ≈170 en JS; ~1 min). Detalle en `docs/NOTA_TECNICA.md` §9.
+**Base de calidad:** batería de tests automáticos en `tests/` (≈380 en Python con paridad
+incluida, ≈180 en JS; ~40 s). Detalle en `docs/NOTA_TECNICA.md` §11.
 
 ### 6\.1 Flujo de trabajo para cada cambio
 
@@ -188,22 +218,28 @@ Toda nueva funcionalidad o corrección sigue estos pasos, en este orden:
    (fase, lista de espera o mejoras sueltas). La hoja de ruta siempre refleja lo acordado.
 3. **Plan breve**: qué se cambia, en qué capas y ficheros, qué fórmulas; si hay una
    decisión de criterio actuarial, preguntar a Antonio antes de programar.
-4. **Implementar en ambos motores** (Python y JS) y en ambas interfaces.
-5. **Verificar**: `python tests/ejecutar_tests.py` en verde (añadiendo los tests del cambio:
+4. **Verificación de la base técnica (obligatoria, antes de programar).** Si el cambio
+   introduce o modifica una valoración o cualquier cálculo con base técnica, presentar a
+   Antonio la base técnica completa (hipótesis, valores y probabilidades de la v.a., fórmulas
+   de momentos y primas, controles previstos) y **esperar su visto bueno**. Sin él no se
+   escribe código.
+5. **Implementar en ambos motores** (Python y JS) y en ambas interfaces.
+6. **Verificar**: `python tests/ejecutar_tests.py` en verde (añadiendo los tests del cambio:
    identidades, comprobación independiente y paridad) y comprobación visual de la interfaz.
-6. **Documentar en el mismo commit**:
+7. **Documentar en el mismo commit**:
    - `docs/NOTA_TECNICA.md`: toda fórmula, hipótesis, dato o magnitud nueva o cambiada;
-     subir versión y añadir línea en su historial (§11). **Obligatorio** si cambia algún
-     cálculo; una corrección solo de interfaz no lo requiere.
+     subir versión y añadir línea en su historial (§13). **Obligatorio y automático** (sin
+     esperar a que Antonio lo pida) siempre que se implemente algo con base técnica o cambie
+     algún cálculo; una corrección solo de interfaz no lo requiere.
    - `CHANGELOG.md`: entrada con fecha.
    - Este fichero: §6 (estado), §7 (hoja de ruta) y §8 si procede de una asignatura.
    - `README.md` si cambia lo que la calculadora calcula.
-7. **Compilar, siempre las dos** (petición de Antonio, sin esperar a que lo pida): web
+8. **Compilar, siempre las dos** (petición de Antonio, sin esperar a que lo pida): web
    (`node build.mjs` en `web/` y copiar el HTML a `index.html`, en el mismo commit) y el `.exe`
    (`python -m PyInstaller --noconfirm --clean calculadora.spec` en `python/`; `build_exe.bat`
    hace lo mismo pero se queda en `pause`). Mover `dist/CalculadoraSupervivencia.exe` a
    `ejecutables/` y borrar `build/` y `dist/`.
-8. **Commit** con mensaje descriptivo. **Push solo cuando Antonio lo pida.**
+9. **Commit** con mensaje descriptivo. **Push solo cuando Antonio lo pida.**
 
 ## 7\. Hoja de ruta
 
@@ -219,7 +255,7 @@ paridad: cada fase se cierra cuando funciona en ambas y pasa los tests.
    `_t p` a partir de las `l_x` individuales.
 3. **Producto**: qué se paga, cuándo y condicionado a qué (supervivencia o fallecimiento).
    Rentas y seguros son productos; el mixto es la suma de dos.
-4. **Descuento**: función `v(t)`. Hoy `(1+I)^{-t}` con `I` constante.
+4. **Descuento**: función `v(t)`. Hoy `(1+I)^{-t}` con `I` constante (`descuento.py`/`.js`).
 
 Cada contenido nuevo es una pieza en una capa, sin rehacer las demás.
 
@@ -233,6 +269,23 @@ Cada contenido nuevo es una pieza en una capa, sin rehacer las demás.
 | 4 | **Carteras y exportación** | Cargar una BBDD de asegurados, valorar en lote; exportar a Excel y PDF. |
 
 **Fase activa: 2.** Las decisiones de diseño de cada fase se anotan aquí al cerrarla.
+
+**Fase 2, en curso.** Hecho el 2026-10-07: seguros sobre una cabeza (los cinco contratos,
+con distribución, momentos, métricas y funciones de masa y distribución), capas de producto
+y descuento separadas, tipo técnico por defecto (b) y recargo α en rentas y seguros (c).
+**Pendiente:** (a) la función de densidad de la vida residual, aplazada por Antonio el
+2026-10-07. Decisiones tomadas (base técnica verificada por Antonio el 2026-10-07):
+
+- Mixto con **dos capitales** `C_f` y `C_s` (por defecto iguales); fuera del mixto, un único
+  capital `C`.
+- Diferimiento `m` en temporal, vida entera y mixto; **no** en el capital diferido. En el
+  mixto diferido, la supervivencia se paga en `m + n`.
+- Vida entera con `n = w + 1 − x − m`. Fórmula del diferido con índice `i = 1..n`
+  (`v^{m+i}`, `_{m+i−1|}q_x`).
+- `α ≥ 0` sobre la prima pura única. El 1,95 % se presenta como valor de referencia: la
+  resolución lo fija como máximo para provisiones de contratos anteriores a 2016.
+- Momentos centrales directos (destapado por la paridad: con `I = 0` la vida entera es
+  degenerada y la fórmula por momentos ordinarios daba asimetrías de ~10⁸).
 
 **Fase 1, cerrada el 2026-10-07.** Decisiones:
 
@@ -251,8 +304,10 @@ Cada contenido nuevo es una pieza en una capa, sin rehacer las demás.
 Fuente: resolución anual de la DGSFP "por la que se publica el tipo de interés máximo a
 utilizar en el cálculo contable de la provisión de seguros de vida", en el BOE de enero,
 en aplicación del art. 33 del ROSSP (RD 2486/1998). **2026: 1,95 %**
-(Resolución de 9 de enero de 2026, BOE-A-2026-1226). La calculadora lo ofrecerá como valor
-por defecto, con año y referencia visibles y editable. Se actualiza cada enero.
+(Resolución de 9 de enero de 2026, BOE-A-2026-1226, BOE núm. 16 de 19 de enero; verificado
+el 2026-10-07). Es el valor por defecto en rentas y seguros, editable, con año y referencia
+visibles; vive en `TIPO_TECNICO` de `descuento.py` y `descuento.js`. **Se actualiza cada
+enero** (los dos ficheros y la nota técnica §10.2).
 
 ### 7\.4 Lista de espera (cuando se estudie)
 
@@ -271,4 +326,8 @@ tachan al implementarlas, con referencia a su entrada del `CHANGELOG.md`.
 Cuando una mejora proceda de material de clase (guardado en `apuntes/`, fuera del repo),
 anotar aquí: asignatura, qué se incorpora y qué decisiones propias se tomaron.
 
-*(sin entradas todavía)*
+- **Seguros de Vida, apuntes 8–9** (`apuntes/seguros_de_vida/`), 2026-10-07: tipos de
+  contrato (temporal, capital diferido, mixto, vida entera, diferidos) como v.a. del valor
+  actual, momentos y prima pura única. Implementados en la pestaña Seguros de vida.
+  Decisiones propias: dos capitales en el mixto, diferimiento también en el mixto, índice
+  corregido en la fórmula del diferido (§7.2, fase 2).

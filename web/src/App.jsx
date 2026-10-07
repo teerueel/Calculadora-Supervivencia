@@ -8,6 +8,7 @@ import {
 } from "./engine.js";
 import Atlas, { PARAM_ATLAS } from "./atlas.jsx";
 import Rentas from "./rentas.jsx";
+import Seguros from "./seguros.jsx";
 
 /* ============================ Formato ============================ */
 const parseNum = (s) => { const t = String(s).trim().replace(/\s/g, "").replace(",", "."); return /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(t) ? Number(t) : NaN; };
@@ -241,7 +242,7 @@ function ChartTrio({ series, x, n, m, t, logMu, setLogMu, C, single }) {
 }
 
 /* ============================ Validación ============================ */
-/* Controles comunes que reutiliza la pestaña de rentas */
+/* Controles comunes que reutilizan las pestañas de rentas y seguros */
 const RENTAS_UI = { Sym, SegCtl, Field, TableSelect, TableTags };
 
 function validate({ x, n, m, year, needYear }) {
@@ -371,13 +372,13 @@ export default function App() {
           <p>Probabilidades de supervivencia y fallecimiento con las tablas PER2020 y PASEM2020 (BOE-A-2020-17154) y con leyes paramétricas de mortalidad.</p>
         </div>
         <nav className="tabs" role="tablist" aria-label="Secciones">
-          {[["tablas", "Tablas de mortalidad"], ["param", "Modelos paramétricos"], ["cmp", "Comparación"], ["rentas", "Rentas actuariales"], ["atlas", "Atlas"]].map(([k, lbl]) => (
+          {[["tablas", "Tablas de mortalidad"], ["param", "Modelos paramétricos"], ["cmp", "Comparación"], ["rentas", "Rentas actuariales"], ["seguros", "Seguros de vida"], ["atlas", "Atlas"]].map(([k, lbl]) => (
             <button key={k} role="tab" type="button" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{lbl}</button>
           ))}
         </nav>
       </header>
 
-      {tab === "atlas" ? <Atlas /> : tab === "rentas" ? <Rentas ui={RENTAS_UI} /> : (
+      {tab === "atlas" ? <Atlas /> : tab === "rentas" ? <Rentas ui={RENTAS_UI} /> : tab === "seguros" ? <Seguros ui={RENTAS_UI} /> : (
         <div className="layout">
           {/* ====================== PANEL ====================== */}
           <aside className="panel" aria-label="Parámetros">

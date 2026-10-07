@@ -18,12 +18,13 @@ equivalentes: una aplicación web y una de escritorio.
 | ₘ\|ₙqₓ | probabilidad de que (x) fallezca entre las edades x+m y x+m+n |
 | eₓ, e̊ₓ | esperanza de vida abreviada y completa |
 | ₖ\|ä⁽ᵐ⁾ₓ:ₙ⌉, ₖ\|a⁽ᵐ⁾ₓ:ₙ⌉ | distribución, momentos de orden s y métricas de una renta actuarial |
+| ₘ\|A¹ₓ:ₙ⌉, ₘ\|Aₓ, ₙEₓ, ₘ\|Aₓ:ₙ⌉ | distribución, momentos y métricas de un seguro temporal, vida entera, de capital diferido o mixto |
 
 La edad x, el plazo n y el diferimiento m admiten decimales. Las edades no enteras se
 resuelven repartiendo dentro del año la qₓ publicada, con interpolación lineal (UDD) o
 exponencial (fuerza de mortalidad constante), seleccionable.
 
-## Las cinco pestañas
+## Las seis pestañas
 
 1. **Tablas de mortalidad** — nueve tablas: PER2020 Individual y Colectiva (generacionales,
    con factor de mejora sobre la cohorte) y PASEM2020 General, Rel, NoRel y Decesos
@@ -37,8 +38,12 @@ exponencial (fuerza de mortalidad constante), seleccionable.
    año, cuantía por plazo c (cuantía anual C = m·c), diferimiento k e interés efectivo anual I.
    Muestra la distribución (valores y probabilidades), los momentos E[Yˢ] de los órdenes
    elegidos y, a partir de ellos, media (prima pura única), varianza, desviación típica,
-   coeficiente de variación, asimetría, curtosis, cuantiles, VaR y TVaR al 99,5 %.
-5. **Atlas** — guía de los modelos paramétricos y de las tablas e hipótesis de interpolación.
+   coeficiente de variación, asimetría, curtosis, cuantiles, VaR y TVaR al 99,5 %, y la prima
+   pura, el importe del recargo de seguridad α y la prima recargada.
+5. **Seguros de vida** — temporal a n años, vida entera, capital diferido y mixto (con capital
+   de fallecimiento y de supervivencia distintos), diferidos m años salvo el capital diferido.
+   Mismos resultados que en rentas, con funciones de masa y de distribución del valor actual.
+6. **Atlas** — guía de los modelos paramétricos y de las tablas e hipótesis de interpolación.
 
 En las tres primeras, tres gráficas: supervivencia ₜpₓ, distribución ₜqₓ y tanto instantáneo μₓ₊ₜ.
 
@@ -70,6 +75,24 @@ Con v = (1+I)⁻¹, N = m·n plazos y n = w + 1 − x − k en la vitalicia (w =
 Los momentos son E[Yˢ] = Σ valorˢ · prob. Las probabilidades se leen de lₓ; las edades x + j/m
 no enteras usan interpolación lineal (UDD). x es entera; n y k, múltiplos de 1/m.
 
+### Seguros de vida
+
+x, n y m enteros; el capital de fallecimiento C_f se paga al final del año de fallecimiento y
+el de supervivencia C_s al vencimiento:
+
+| Contrato | Valores del valor actual Z |
+| --- | --- |
+| Temporal ₘ\|A¹ₓ:ₙ⌉ | C_f·v^(m+i) con ₘ₊ᵢ₋₁\|qₓ (i = 1…n); 0 con ₘqₓ + ₘ₊ₙpₓ |
+| Vida entera ₘ\|Aₓ | igual con n = w + 1 − x − m; 0 con ₘqₓ |
+| Capital diferido ₙEₓ | C_s·vⁿ con ₙpₓ; 0 con ₙqₓ |
+| Mixto ₘ\|Aₓ:ₙ⌉ | 0 con ₘqₓ; C_f·v^(m+i) con ₘ₊ᵢ₋₁\|qₓ; C_s·v^(m+n) con ₘ₊ₙpₓ |
+
+### Interés técnico y recargo
+
+En rentas y seguros, el interés por defecto es el tipo máximo de la DGSFP para la provisión de
+seguros de vida del año (2026: 1,95 %, [BOE-A-2026-1226](https://www.boe.es/buscar/doc.php?id=BOE-A-2026-1226)),
+editable. El recargo de seguridad α ≥ 0 lo elige el usuario: prima recargada = (1 + α) · prima pura.
+
 ## Estructura
 
 ```
@@ -81,10 +104,11 @@ CLAUDE.md convenciones técnicas, decisiones y hoja de ruta
 CHANGELOG.md  historial de cambios
 ```
 
-El motor está separado de la interfaz: `python/datos.py`, `python/tablas.py`,
-`python/modelos.py` y `python/rentas.py`, con sus equivalentes en `web/src/data.js`, `web/src/engine.js` y `web/src/rentas.js`. Ambos
-motores dan el mismo resultado: los tests lo comprueban con tolerancia 10⁻⁸ y la diferencia
-medida es del orden de 10⁻¹⁵ (10⁻¹¹ en los momentos de orden alto de las rentas).
+El motor está separado de la interfaz: `python/datos.py`, `tablas.py`, `modelos.py`,
+`descuento.py`, `distribucion.py`, `rentas.py` y `seguros.py`, con sus equivalentes en
+`web/src/` (`data.js`, `engine.js`, `descuento.js`, `distribucion.js`, `rentas.js`, `seguros.js`).
+Ambos motores dan el mismo resultado: los tests lo comprueban con tolerancia 10⁻⁸ y la
+diferencia medida es del orden de 10⁻¹⁵ (5·10⁻¹⁴ en los momentos de orden alto).
 
 ## Ejecutar
 
@@ -113,8 +137,9 @@ python tests/ejecutar_tests.py
 Comprueban la construcción de lₓ, la identidad ₘqₓ + ₘ|ₙqₓ + ₘ₊ₙpₓ = 1, la interpolación y
 μ, las esperanzas de vida frente a integración numérica, la coherencia μ = H′ de los modelos,
 que la distribución de cada renta suma 1 y que su media coincide con la valoración pago a
-pago, la igualdad numérica de los dos motores y los datos frente al BOE. El detalle está en
-`docs/NOTA_TECNICA.md` §9.
+pago, que la prima de cada seguro coincide con la de las funciones de conmutación y con
+Aₓ = 1 − d·äₓ, la igualdad numérica de los dos motores y los datos frente al BOE. El detalle
+está en `docs/NOTA_TECNICA.md` §11.
 
 El cotejo con el BOE también puede lanzarse solo: `python/verificacion_boe.py` compara
 casilla por casilla los datos del código con los anexos, extraídos a `boe_anexos.json`:

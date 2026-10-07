@@ -1,7 +1,7 @@
 """
 Calculadora de supervivencia — aplicación de escritorio (PySide6 + matplotlib).
 
-Pestañas: Tablas de mortalidad · Modelos paramétricos · Comparación · Rentas actuariales · Atlas.
+Pestañas: Tablas de mortalidad · Modelos paramétricos · Comparación · Rentas actuariales · Seguros de vida · Atlas.
 Ejecutar:            python app.py
 Generar el .exe:     build_exe.bat   (o pyinstaller calculadora.spec)
 """
@@ -25,8 +25,11 @@ from PySide6.QtWidgets import (  # noqa: E402
 )
 
 import atlas  # noqa: E402
+import descuento  # noqa: E402
+import distribucion  # noqa: E402
 import modelos  # noqa: E402
 import rentas  # noqa: E402
+import seguros  # noqa: E402
 import tablas  # noqa: E402
 from datos import TABLES, TABLE_GROUPS  # noqa: E402
 
@@ -848,10 +851,11 @@ class RentaCharts(FigureCanvasQTAgg):
         self.axP, self.axF = self.fig.subplots(1, 2)
         self.fig.subplots_adjust(left=0.06, right=0.99, bottom=0.17, top=0.88, wspace=0.18)
 
-    def plot(self, rows, M, logp=True):
+    def plot(self, rows, M, logp=True, Z="Y"):
         es = lambda v, _p: f"{v:g}".replace(".", ",")  # noqa: E731
         eur = lambda v, _p: fnum(v, 0)  # noqa: E731
-        for ax, title in ((self.axP, "Función de masa  P(Y = y)"), (self.axF, "Función de distribución  F(y)")):
+        z = Z.lower()
+        for ax, title in ((self.axP, f"Función de masa  P({Z} = {z})"), (self.axF, f"Función de distribución  F({z})")):
             ax.clear(); ax.set_facecolor(C["sheet"])
             ax.set_title(title, loc="left", fontsize=12, family="serif", color=C["ink"], fontweight="bold")
             ax.grid(True, color=C["rule"], ls=":", lw=0.8)
@@ -862,11 +866,11 @@ class RentaCharts(FigureCanvasQTAgg):
             ax.xaxis.set_major_formatter(FuncFormatter(eur))
         ys = [r["val"] for r in rows if r["prob"] > 0]
         ps = [r["prob"] for r in rows if r["prob"] > 0]
-        self.axP.vlines(ys, 0 if not logp else min(ps) / 3, ps, color=C["mu"], lw=1.2)
+        self.axP.vlines(ys, 0 if not logp else min(min(ps) / 3, 0.01), ps, color=C["mu"], lw=1.2)
         self.axP.plot(ys, ps, "o", color=C["mu"], ms=2.5)
         if logp:
             self.axP.set_yscale("log")
-            self.axP.set_ylim(min(ps) / 3, 1.5)
+            self.axP.set_ylim(min(min(ps) / 3, 0.01), 1.5)
         else:
             self.axP.set_yscale("linear"); self.axP.set_ylim(0, max(ps) * 1.08)
             self.axP.yaxis.set_major_formatter(FuncFormatter(es))
@@ -881,7 +885,120 @@ class RentaCharts(FigureCanvasQTAgg):
         self.draw_idle()
 
 
-class RentasTab(CalcTab):
+TT_TXT = fA(descuento.TIPO_TECNICO["I"] * 100)
+
+
+def fill_table(tab, heads, rows, rich_cols=(), left_cols=(), bold_rows=()):
+    tab.clear(); tab.setColumnCount(len(heads)); tab.setHorizontalHeaderLabels(heads); tab.setRowCount(len(rows))
+    tab.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+    for i, r in enumerate(rows):
+        for j, s in enumerate(r):
+            if j in rich_cols:
+                lb = QLabel(s); lb.setContentsMargins(8, 0, 8, 0); tab.setCellWidget(i, j, lb)
+            else:
+                it = QTableWidgetItem(s)
+                if i in bold_rows:
+                    f = it.font(); f.setBold(True); it.setFont(f)
+                it.setTextAlignment((Qt.AlignLeft if j in left_cols else Qt.AlignRight) | Qt.AlignVCenter); tab.setItem(i, j, it)
+    tab.resizeRowsToContents()
+    h = tab.horizontalHeader().height() + sum(tab.rowHeight(i) for i in range(len(rows))) + 4
+    tab.setFixedHeight(min(h, 420))
+
+
+def ro_table():
+    t = QTableWidget(); t.setEditTriggers(QAbstractItemView.NoEditTriggers); t.verticalHeader().setVisible(False)
+    return t
+
+
+class DistTab(CalcTab):
+    """Base de las pestañas de rentas y seguros: interés técnico y recargo, prima, momentos,
+    métricas, gráficas y tabla de la distribución del valor actual."""
+
+    def interes_recargo(self):
+        w, v = block("Interés y recargo")
+        g = QGridLayout(); g.setHorizontalSpacing(10)
+        self.fi, self.fa = NumField("Interés técnico I (%)", TT_TXT), NumField("Recargo α (%)", "0")
+        g.addWidget(self.fi, 0, 0); g.addWidget(self.fa, 0, 1)
+        for f in (self.fi, self.fa):
+            f.changed.connect(self.refresh)
+        self.btnTT = QPushButton(f"Volver a {TT_TXT} %"); self.btnTT.setObjectName("ghost")
+        self.btnTT.clicked.connect(lambda: self.fi.edit.setText(TT_TXT))
+        tt = descuento.TIPO_TECNICO
+        v.addLayout(g); v.addWidget(self.btnTT, 0, Qt.AlignLeft)
+        v.addWidget(note(f"Por defecto, {TT_TXT} %: tipo máximo de la DGSFP para la provisión de seguros de vida en "
+                         f"{tt['año']} ({tt['ref']}). Editable."))
+        v.addWidget(note("Descuento v = (1 + I)⁻¹. Prima recargada = (1 + α) · prima pura."))
+        return w
+
+    def results_common(self, Z):
+        self.Z = Z
+        self.ctx = QLabel(); self.ctx.setObjectName("context"); self.ctx.setWordWrap(True)
+        self.head = Card(C["ink"])
+        self.hsym = QLabel(); self.hval = QLabel(); self.hval.setObjectName("rnum"); self.hdesc = QLabel()
+        self.hdesc.setObjectName("rdesc"); self.hdesc.setWordWrap(True)
+        hr = QHBoxLayout(); hr.addWidget(self.hsym); hr.addStretch(1); hr.addWidget(self.hval)
+        self.head.lay.addLayout(hr); self.head.lay.addWidget(self.hdesc)
+        self.pcard = Card(); t = QLabel("Prima única"); t.setObjectName("h3"); self.pcard.lay.addWidget(t)
+        self.ptab = ro_table(); self.pcard.lay.addWidget(self.ptab)
+        self.pcard.lay.addWidget(note("El recargo α lo fija el usuario; la calculadora no impone ningún principio de cálculo de primas."))
+        self.mcard = Card(); t = QLabel("Momentos de orden s"); t.setObjectName("h3"); self.mcard.lay.addWidget(t)
+        self.mtab = ro_table(); self.mcard.lay.addWidget(self.mtab)
+        self.kcard = Card(); t = QLabel("Métricas derivadas"); t.setObjectName("h3"); self.kcard.lay.addWidget(t)
+        self.ktab = ro_table(); self.kcard.lay.addWidget(self.ktab)
+        self.qtab = ro_table(); self.qtab.setFixedHeight(68); self.kcard.lay.addWidget(self.qtab)
+        self.knote = note("Distribución degenerada (un único valor): sin asimetría ni curtosis."); self.kcard.lay.addWidget(self.knote)
+        self.prow = QHBoxLayout(); self.prow.addStretch(1); self.prow.addWidget(QLabel("Escala de la probabilidad:"))
+        self.slog = Seg([("log", "Log"), ("lin", "Lineal")], "log", small=True); self.slog.changed.connect(self.refresh)
+        self.prow.addWidget(self.slog)
+        self.chart = RentaCharts()
+        self.cap = note("Línea discontinua: media (prima pura única). Línea punteada roja: VaR al 99,5 %.")
+        self.btnD = QPushButton("Mostrar la distribución"); self.btnD.setObjectName("ghost"); self.btnD.setCheckable(True)
+        self.btnD.toggled.connect(self.refresh)
+        self.dtab = ro_table(); self.dtab.setMinimumHeight(380); self.dtab.hide()
+
+    def layout_results(self, extra=()):
+        for wdg in (self.err, self.ctx, self.head, *extra, self.pcard, self.mcard, self.kcard):
+            self.mv.addWidget(wdg)
+        self.mv.addLayout(self.prow); self.mv.addWidget(self.chart); self.mv.addWidget(self.cap)
+        self.mv.addWidget(self.btnD, 0, Qt.AlignLeft); self.mv.addWidget(self.dtab); self.mv.addStretch(1)
+        self.result_widgets = [self.ctx, self.head, *extra, self.pcard, self.mcard, self.kcard, self.chart, self.cap, self.btnD]
+
+    def read_ir(self):
+        I, alpha = self.fi.val() / 100, self.fa.val() / 100
+        self.btnTT.setVisible(not (math.isfinite(I) and abs(I - descuento.TIPO_TECNICO["I"]) < 1e-12))
+        return I, alpha
+
+    def fill_common(self, D, mom_label):
+        Z, z = self.Z, self.Z.lower()
+        M, P = D["metricas"], D["prima"]
+        fill_table(self.ptab, ["Concepto", "Definición", "Importe (€)"], [
+            ["Prima pura única", f"E[{Z}]", fbig(P["pura"])],
+            ["Recargo de seguridad", f"α · E[{Z}], con α = {fA(P['alpha'] * 100)} %", fbig(P["recargo"])],
+            ["Prima recargada", f"(1 + α) · E[{Z}]", fbig(P["recargada"])],
+        ], left_cols=(0, 1), bold_rows=(2,))
+        fill_table(self.mtab, ["s", "Momento", "Valor (€ˢ)"],
+                   [[str(s), f"E[ ({mom_label})<sup>{s}</sup> ]", fbig(v)] for s, v in D["momentos"].items()], (1,))
+        fill_table(self.ktab, ["Métrica", "Definición", "Valor"], [
+            ["Media", f"E[{Z}] = prima pura única", fbig(M["media"]) + " €"],
+            ["Varianza", f"E[({Z} − E[{Z}])²]", fbig(M["var"]) + " €²"],
+            ["Desviación típica", f"σ = √Var({Z})", fbig(M["sd"]) + " €"],
+            ["Coeficiente de variación", f"σ / E[{Z}]", fnum(M["cv"], 6)],
+            ["Asimetría", f"E[({Z} − E[{Z}])³] / σ³", fnum(M["asim"], 6)],
+            ["Curtosis", f"E[({Z} − E[{Z}])⁴] / σ⁴  (exceso = curtosis − 3)",
+             f"{fnum(M['curt'], 6)}  (exceso {fnum(M['curt'] - 3, 6)})" if math.isfinite(M["curt"]) else "—"],
+            ["VaR 99,5 %", f"Q(0,995) = mín{{ {z} : F({z}) ≥ 0,995 }}", fbig(M["var995"]) + " €"],
+            ["TVaR 99,5 %", "(1/0,005) ∫ Q(u) du  entre 0,995 y 1", fbig(M["tvar995"]) + " €"],
+        ], left_cols=(0, 1))
+        self.knote.setVisible(not M["sd"] > 0)
+        qs = M["cuantiles"]
+        fill_table(self.qtab, [f"Q({fnum(a * 100, 1 if a == 0.995 else 0)} %)" for a in qs], [[fbig(v) for v in qs.values()]])
+        self.chart.plot(D["rows"], M, self.slog.value == "log", Z)
+        self.btnD.setText(("Ocultar" if self.btnD.isChecked() else "Mostrar") + f" la distribución ({len(D['rows'])} valores)")
+        self.dtab.setVisible(self.btnD.isChecked())
+        return self.btnD.isChecked()
+
+
+class RentasTab(DistTab):
     def __init__(self):
         super().__init__()
         w, v = block("Tabla")
@@ -919,14 +1036,11 @@ class RentasTab(CalcTab):
         v.addWidget(self.sdur); v.addLayout(g); v.addWidget(self.spre); v.addWidget(self.nnote)
         self.pv.addWidget(w)
 
-        w, v = block("Cuantía e interés")
-        g = QGridLayout(); g.setHorizontalSpacing(10)
-        self.fc, self.fi = NumField("Cuantía por plazo (€)", "1000"), NumField("Interés I (%)", "3")
-        g.addWidget(self.fc, 0, 0); g.addWidget(self.fi, 0, 1)
-        for f in (self.fc, self.fi):
-            f.changed.connect(self.refresh)
+        w, v = block("Cuantía")
+        self.fc = NumField("Cuantía por plazo c (€)", "1000"); self.fc.changed.connect(self.refresh)
         self.cnote = note("")
-        v.addLayout(g); v.addWidget(self.cnote); self.pv.addWidget(w)
+        v.addWidget(self.fc); v.addWidget(self.cnote); self.pv.addWidget(w)
+        self.pv.addWidget(self.interes_recargo())
 
         w, v = block("Momentos")
         self.fo = NumField("Órdenes s", "1, 2, 3"); self.fo.changed.connect(self.refresh)
@@ -935,55 +1049,9 @@ class RentasTab(CalcTab):
         self.pv.addWidget(note("Las edades no enteras x + j/m usan interpolación lineal de lₓ (UDD)."))
         self.pv.addStretch(1)
 
-        self.ctx = QLabel(); self.ctx.setObjectName("context"); self.ctx.setWordWrap(True)
-        # símbolo y prima pura
-        self.head = Card(C["ink"])
-        self.hsym = QLabel(); self.hval = QLabel(); self.hval.setObjectName("rnum"); self.hdesc = QLabel()
-        self.hdesc.setObjectName("rdesc"); self.hdesc.setWordWrap(True)
-        hr = QHBoxLayout(); hr.addWidget(self.hsym); hr.addStretch(1); hr.addWidget(self.hval)
-        self.head.lay.addLayout(hr); self.head.lay.addWidget(self.hdesc)
-        # momentos
-        self.mcard = Card(); t = QLabel("Momentos de orden s"); t.setObjectName("h3"); self.mcard.lay.addWidget(t)
-        self.mtab = QTableWidget(); self.mtab.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.mtab.verticalHeader().setVisible(False); self.mcard.lay.addWidget(self.mtab)
-        # métricas
-        self.kcard = Card(); t = QLabel("Métricas derivadas"); t.setObjectName("h3"); self.kcard.lay.addWidget(t)
-        self.ktab = QTableWidget(); self.ktab.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.ktab.verticalHeader().setVisible(False); self.kcard.lay.addWidget(self.ktab)
-        self.qtab = QTableWidget(); self.qtab.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.qtab.verticalHeader().setVisible(False); self.qtab.setFixedHeight(68); self.kcard.lay.addWidget(self.qtab)
-        # gráficas
-        prow = QHBoxLayout(); prow.addStretch(1); prow.addWidget(QLabel("Escala de la probabilidad:"))
-        self.slog = Seg([("log", "Log"), ("lin", "Lineal")], "log", small=True); self.slog.changed.connect(self.refresh)
-        prow.addWidget(self.slog)
-        self.chart = RentaCharts()
-        self.cap = note("Línea discontinua: media (prima pura única). Línea punteada roja: VaR al 99,5 %.")
-        # distribución
-        self.btnD = QPushButton("Mostrar la distribución"); self.btnD.setObjectName("ghost"); self.btnD.setCheckable(True)
-        self.btnD.toggled.connect(self.refresh)
-        self.dtab = QTableWidget(); self.dtab.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.dtab.setMinimumHeight(380); self.dtab.verticalHeader().setVisible(False); self.dtab.hide()
-        for wdg in (self.err, self.ctx, self.head, self.mcard, self.kcard):
-            self.mv.addWidget(wdg)
-        self.mv.addLayout(prow); self.mv.addWidget(self.chart); self.mv.addWidget(self.cap)
-        self.mv.addWidget(self.btnD, 0, Qt.AlignLeft); self.mv.addWidget(self.dtab); self.mv.addStretch(1)
-        self.result_widgets = [self.ctx, self.head, self.mcard, self.kcard, self.chart, self.cap, self.btnD]
+        self.results_common("Y")
+        self.layout_results()
         self.recompute()
-
-    @staticmethod
-    def _fill(tab, heads, rows, rich_cols=(), left_cols=()):
-        tab.clear(); tab.setColumnCount(len(heads)); tab.setHorizontalHeaderLabels(heads); tab.setRowCount(len(rows))
-        tab.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        for i, r in enumerate(rows):
-            for j, s in enumerate(r):
-                if j in rich_cols:
-                    lb = QLabel(s); lb.setContentsMargins(8, 0, 8, 0); tab.setCellWidget(i, j, lb)
-                else:
-                    it = QTableWidgetItem(s)
-                    it.setTextAlignment((Qt.AlignLeft if j in left_cols else Qt.AlignRight) | Qt.AlignVCenter); tab.setItem(i, j, it)
-        tab.resizeRowsToContents()
-        h = tab.horizontalHeader().height() + sum(tab.rowHeight(i) for i in range(len(rows))) + 4
-        tab.setFixedHeight(min(h, 420))
 
     def recompute(self):
         key = combo_key(self.cb) or "per_ind_2"
@@ -993,16 +1061,18 @@ class RentasTab(CalcTab):
         self.fn.setVisible(not vit)
         m = self.cm.currentData()
         x, n, k, year = self.fx.val(), self.fn.val(), self.fk.val(), self.fy.val()
-        c, I = self.fc.val(), self.fi.val() / 100
+        c = self.fc.val()
+        I, alpha = self.read_ir()
         sex = self.ssex.value
         self.ynote.setText(f"Generación {int(year - math.floor(x))}" if per and math.isfinite(x) and math.isfinite(year)
                            else "Tabla estática: no depende del año (base 2019).")
-        self.cnote.setText(f"Cuantía anual C = m · c = {fnum(m * c, 2)} €; descuento v = (1 + I)⁻¹, "
-                           f"y v<sup>1/{m}</sup> para cada plazo." if math.isfinite(c) and m > 1 else
-                           "Cuantía anual C = c; descuento v = (1 + I)⁻¹.")
+        self.cnote.setText(f"Cuantía anual C = m · c = {fnum(m * c, 2)} €; cada plazo se descuenta con v<sup>1/{m}</sup>."
+                           if math.isfinite(c) and m > 1 else "Cuantía anual C = c.")
         e = rentas.validar(x, n, m, k, I, c, vit, per, year)
         if not e:
             e = rentas.validar_tabla(key, sex, int(year) if per else 2019, x)
+        if not e:
+            e = distribucion.validar_recargo(alpha)
         try:
             ords = parse_ordenes(self.fo.edit.text())
         except ValueError:
@@ -1013,7 +1083,7 @@ class RentasTab(CalcTab):
         if e:
             self.dtab.hide(); return
         year = int(year) if per else 2019
-        D = rentas.calcular(key, sex, year, x, n, m, k, I, c, pre, vit, ords)
+        D = rentas.calcular(key, sex, year, x, n, m, k, I, c, pre, vit, ords, alpha)
         M = D["metricas"]
         xs = fA(D["x"]); ks = fA(D["k"]); ns = fA(D["n"])
         self.ctx.setText(f"{'Hombre' if sex == 'H' else 'Mujer'} de {xs} años, {t['label']}. "
@@ -1027,30 +1097,195 @@ class RentasTab(CalcTab):
                            f"Probabilidad de cobrar la renta completa: "
                            + (fP(D["p_completa"]) if not vit else "0 (vitalicia)") + ".")
         Ss = renta_sym(pre, m, ks, ns, vit, xs)
-        self._fill(self.mtab, ["s", "Momento", "Valor (€ˢ)"],
-                   [[str(s), f"E[ (C · {Ss})<sup>{s}</sup> ]", fbig(v)] for s, v in D["momentos"].items()], (1,))
-        self._fill(self.ktab, ["Métrica", "Definición", "Valor"], [
-            ["Media", "E[Y] = prima pura única", fbig(M["media"]) + " €"],
-            ["Varianza", "E[Y²] − E[Y]²", fbig(M["var"]) + " €²"],
-            ["Desviación típica", "σ = √Var(Y)", fbig(M["sd"]) + " €"],
-            ["Coeficiente de variación", "σ / E[Y]", fnum(M["cv"], 6)],
-            ["Asimetría", "E[(Y − E[Y])³] / σ³", fnum(M["asim"], 6)],
-            ["Curtosis", "E[(Y − E[Y])⁴] / σ⁴  (exceso = curtosis − 3)", f"{fnum(M['curt'], 6)}  (exceso {fnum(M['curt'] - 3, 6)})"],
-            ["VaR 99,5 %", "Q(0,995) = mín{ y : F(y) ≥ 0,995 }", fbig(M["var995"]) + " €"],
-            ["TVaR 99,5 %", "(1/0,005) ∫ Q(u) du  entre 0,995 y 1", fbig(M["tvar995"]) + " €"],
-        ], left_cols=(0, 1))
-        qs = M["cuantiles"]
-        self._fill(self.qtab, [f"Q({fnum(a * 100, 1 if a == 0.995 else 0)} %)" for a in qs], [[fbig(v) for v in qs.values()]])
-        self.chart.plot(D["rows"], M, self.slog.value == "log")
-        self.btnD.setText(("Ocultar" if self.btnD.isChecked() else "Mostrar") + f" la distribución ({len(D['rows'])} valores)")
-        self.dtab.setVisible(self.btnD.isChecked())
+        self.fill_common(D, f"C · {Ss}")
         if self.btnD.isChecked():
             base = "ä" if pre else "a"; F = 0.0; out = []
             for r in D["rows"]:
                 F += r["prob"]
                 vs = "0" if r["vsym"][0] == "0" else fin_sym(base, m, rentas.frac(D["K"], m), r["vsym"][1], 16)
                 out.append([str(r["pagos"]), vs, prob_sym(r["psym"], xs), fL(r["val"]), fnum(r["prob"], 8), fnum(F, 8)])
-            self._fill(self.dtab, ["Pagos", "Valor", "Probabilidad", "Valor (€)", "Prob.", "F(y)"], out, (1, 2))
+            fill_table(self.dtab, ["Pagos", "Valor", "Probabilidad", "Valor (€)", "Prob.", "F(y)"], out, (1, 2))
+            self.dtab.setFixedHeight(420)
+
+
+# ============================================================ Seguros de vida
+def a_sym(m, x, n=None, uno=None, size=None, color=None):
+    """m|A¹_{x:n⌉} (uno='x'), A_{x:n⌉} con ¹ sobre n (uno='n'), ₘ|Aₓ o ₘ|Aₓ:ₙ⌉."""
+    st = f"font-family:{SERIF};" + (f"font-size:{size}px;" if size else "") + (f"color:{color};" if color else "")
+    mm = f"<sub>{m}|</sub>" if m not in (None, "", "0") else ""
+    ang = f":<span style='text-decoration:overline'>{n}</span>⌉" if n is not None else ""
+    if uno == "x":
+        return f"<span style='{st}'>{mm}<i>A</i><sup>1</sup><sub>{x}{ang}</sub></span>"
+    if uno == "n":
+        return f"<span style='{st}'>{mm}<i>A</i><sub>{x}{ang}</sub><sup>1</sup></span>"
+    return f"<span style='{st}'>{mm}<i>A</i><sub>{x}{ang}</sub></span>"
+
+
+def contrato_sym(tipo, m, x, n, size=None, color=None):
+    if tipo == "temporal":
+        return a_sym(m, x, n, "x", size, color)
+    if tipo == "vida_entera":
+        return a_sym(m, x, None, None, size, color)
+    if tipo == "capital_diferido":
+        return a_sym(None, x, n, "n", size, color)
+    return a_sym(m, x, n, None, size, color)
+
+
+def compactar(psym):
+    """Tramos de ≥ 3 años consecutivos de fallecimiento: Σ_{j=a}^{a+k−1} _{j|}qₓ = _{a|k}qₓ."""
+    out = []
+    for t in psym:
+        u = out[-1] if out else None
+        if t[0] == "dq" and u and u[0] in ("dq", "dqk") and (u[1] + 1 if u[0] == "dq" else u[1] + u[2]) == t[1]:
+            out[-1] = ("dqk", u[1], (1 if u[0] == "dq" else u[2]) + 1)
+        else:
+            out.append(t)
+    res = []
+    for t in out:
+        res += [("dq", t[1] + j) for j in range(t[2])] if t[0] == "dqk" and t[2] < 3 else [t]
+    return res
+
+
+def term_sym(t, x, size=16):
+    if t[0] == "dqk":
+        return sym(f"{t[1]}|{t[2]}", "q", x, size)
+    if t[0] == "dq":
+        return sym(None, "q", x, size) if t[1] == 0 else sym(f"{t[1]}|", "q", x, size)
+    return sym(str(t[1]), t[0], x, size)
+
+
+NOTAS_SEG = dict(
+    temporal="Paga C al final del año de fallecimiento si (x) fallece entre las edades x + m y x + m + n.",
+    vida_entera="Paga C al final del año de fallecimiento si (x) fallece después de la edad x + m.",
+    capital_diferido="Paga C en t = n si (x) sigue vivo a la edad x + n.",
+    mixto="Paga C_f al final del año de fallecimiento si (x) fallece entre x + m y x + m + n, o C_s en t = m + n si sobrevive.",
+)
+
+
+class SegurosTab(DistTab):
+    def __init__(self):
+        super().__init__()
+        w, v = block("Tabla")
+        lb = QLabel("Tabla de mortalidad"); lb.setObjectName("flabel")
+        self.cb = grouped_combo(TABLE_GROUPS, lambda k: TABLES[k]["label"]); combo_select(self.cb, "pasem_gen_2")
+        self.cb.currentIndexChanged.connect(self.refresh)
+        v.addWidget(lb); v.addWidget(self.cb); self.pv.addWidget(w)
+
+        w, v = block("Asegurado")
+        lb = QLabel("Sexo"); lb.setObjectName("flabel")
+        self.ssex = Seg([("H", "Hombre"), ("M", "Mujer")], "H"); self.ssex.changed.connect(self.refresh)
+        self.fx = NumField("Edad x", "45"); self.fx.changed.connect(self.refresh)
+        self.fy = NumField("Año de cálculo", "2026"); self.fy.changed.connect(self.refresh)
+        self.ynote = note("")
+        v.addWidget(lb); v.addWidget(self.ssex); v.addWidget(self.fx); v.addWidget(self.fy); v.addWidget(self.ynote)
+        self.pv.addWidget(w)
+
+        w, v = block("Contrato")
+        lb = QLabel("Tipo de seguro"); lb.setObjectName("flabel")
+        self.ctipo = QComboBox()
+        for t in seguros.TIPOS:
+            self.ctipo.addItem(seguros.NOMBRES[t], t)
+        self.ctipo.currentIndexChanged.connect(self.refresh)
+        g = QGridLayout(); g.setHorizontalSpacing(10)
+        self.fn, self.fm = NumField("Duración n (años)", "20"), NumField("Diferimiento m (años)", "0")
+        g.addWidget(self.fn, 0, 0); g.addWidget(self.fm, 0, 1)
+        for f in (self.fn, self.fm):
+            f.changed.connect(self.refresh)
+        self.tnote = note(""); self.tnote2 = note("")
+        v.addWidget(lb); v.addWidget(self.ctipo); v.addLayout(g); v.addWidget(self.tnote); v.addWidget(self.tnote2)
+        self.pv.addWidget(w)
+
+        w, v = block("Capitales")
+        g = QGridLayout(); g.setHorizontalSpacing(10)
+        self.fcf, self.fcs = NumField("Fallecimiento C_f (€)", "100000"), NumField("Supervivencia C_s (€)", "100000")
+        g.addWidget(self.fcf, 0, 0); g.addWidget(self.fcs, 0, 1)
+        for f in (self.fcf, self.fcs):
+            f.changed.connect(self.refresh)
+        v.addLayout(g); self.pv.addWidget(w)
+        self.pv.addWidget(self.interes_recargo())
+
+        w, v = block("Momentos")
+        self.fo = NumField("Órdenes s", "1, 2, 3"); self.fo.changed.connect(self.refresh)
+        v.addWidget(self.fo); v.addWidget(note("Lista o rango de enteros entre 1 y 12, p. ej. «1, 2, 3» o «1-4»."))
+        self.pv.addWidget(w)
+        self.pv.addStretch(1)
+
+        self.results_common("Z")
+        # partes del mixto
+        self.ccard = Card()
+        self.clab = QLabel(); self.clab.setWordWrap(True); self.ccard.lay.addWidget(self.clab)
+        self.layout_results(extra=(self.ccard,))
+        self.recompute()
+
+    def recompute(self):
+        key = combo_key(self.cb) or "pasem_gen_2"
+        t = TABLES[key]; per = t["kind"] == "per"
+        tipo = self.ctipo.currentData() or "temporal"
+        mixto = tipo == "mixto"
+        self.fy.setVisible(per)
+        self.fn.setVisible(tipo in seguros.CON_DURACION); self.fm.setVisible(tipo in seguros.CON_DIFERIMIENTO)
+        self.fcs.setVisible(mixto)
+        self.fcf.findChild(QLabel).setText("Fallecimiento C_f (€)" if mixto else
+                                            f"Capital de {'supervivencia' if tipo in seguros.CON_SUPERVIVENCIA else 'fallecimiento'} C (€)")
+        self.tnote.setText(NOTAS_SEG[tipo])
+        x, n, m, year = self.fx.val(), self.fn.val(), self.fm.val(), self.fy.val()
+        Cf = self.fcf.val(); Cs = self.fcs.val() if mixto else Cf
+        I, alpha = self.read_ir()
+        sex = self.ssex.value
+        self.ynote.setText(f"Generación {int(year - math.floor(x))}" if per and math.isfinite(x) and math.isfinite(year)
+                           else "Tabla estática: no depende del año (base 2019).")
+        e = seguros.validar(tipo, x, n, m, I, Cf, Cs, per, year)
+        if not e:
+            e = seguros.validar_tabla(key, sex, int(year) if per else 2019, x)
+        if not e:
+            e = distribucion.validar_recargo(alpha)
+        try:
+            ords = parse_ordenes(self.fo.edit.text())
+        except ValueError:
+            e = e or "Los órdenes s deben ser enteros entre 1 y 12, separados por comas o como rango (1-4)."
+        self.tnote2.setText("x, n y m enteros. El capital de fallecimiento se paga al final del año de fallecimiento."
+                            + (f" Vida entera: n = w + 1 − x − m = {fA(seguros.W + 1 - x - m)} años (w = 120)."
+                               if tipo == "vida_entera" and not e else ""))
+        self.show_error(e)
+        if e:
+            self.dtab.hide(); self.ccard.hide(); return
+        year = int(year) if per else 2019
+        D = seguros.calcular(key, sex, year, tipo, x, n, m, I, Cf, Cs, ords, alpha)
+        M = D["metricas"]
+        xs, ns, ms = fA(D["x"]), fA(D["n"]), fA(D["m"])
+        nombre = seguros.NOMBRES[tipo].lower()
+        self.ctx.setText(f"{'Hombre' if sex == 'H' else 'Mujer'} de {xs} años, {t['label']}. "
+                         + (f"Generación {D['cohort']}, año de cálculo {year}. " if per else "Tabla estática, año base 2019. ")
+                         + f"Seguro {nombre}" + (f" a {ns} años" if tipo in seguros.CON_DURACION else "")
+                         + (f", diferido {ms} años" if D["m"] > 0 else "")
+                         + (f": {fnum(Cf, 2)} € por fallecimiento y {fnum(Cs, 2)} € por supervivencia." if mixto
+                            else f": capital de {fnum(Cf, 2)} €."))
+        S = contrato_sym(tipo, ms, xs, ns, 30, C["ink"])
+        self.hsym.setText(S if mixto else f"<span style='font-family:{SERIF};font-size:30px'>{fnum(Cf, 2)} · </span>{S}")
+        self.hval.setText(fbig(M["media"]) + " €")
+        self.hdesc.setText(f"Prima pura única: E[Z], con Z el valor actual de la prestación. "
+                           f"Probabilidad de que se pague el capital: {fP(D['p_pago'])}.")
+        self.ccard.setVisible(mixto)
+        if mixto:
+            comp = D["componentes"]
+            self.clab.setText(
+                f"<b>Parte de fallecimiento</b>: C<sub>f</sub> · {a_sym(ms, xs, ns, 'x', 18)} = <b>{fbig(comp['fallecimiento'])} €</b><br>"
+                f"<b>Parte de supervivencia</b>: C<sub>s</sub> · {sym(fA(D['m'] + D['n']), 'E', xs, 18)} = "
+                f"<b>{fbig(comp['supervivencia'])} €</b>")
+        if self.fill_common(D, "Z"):
+            cap = lambda e: ("C<sub>f</sub>" if e["cap"] == "f" else "C<sub>s</sub>") if mixto else "C"  # noqa: E731
+            F = 0.0; out = []
+            for r in D["rows"]:
+                F += r["prob"]
+                pag = [e for e in r["eventos"] if e["cap"] is not None]
+                ts = sorted({e["t"] for e in pag})
+                largo = len(pag) > 3
+                tcol = "—" if not pag else (f"{ts[0]}…{ts[-1]}" if largo else ", ".join(map(str, ts)))
+                vcol = "0" if not pag else (f"{cap(pag[0])} · v<sup>t</sup>, t = {ts[0]}…{ts[-1]}" if largo
+                                            else " = ".join(f"{cap(e)} · v<sup>{e['t']}</sup>" for e in pag))
+                pcol = " + ".join(term_sym(t, xs) for t in compactar([t for e in r["eventos"] for t in e["psym"]]))
+                out.append([tcol, vcol, pcol, fL(r["val"]), fnum(r["prob"], 8), fnum(F, 8)])
+            fill_table(self.dtab, ["Pago en t", "Valor", "Probabilidad", "Valor (€)", "Prob.", "F(z)"], out, (1, 2))
             self.dtab.setFixedHeight(420)
 
 
@@ -1119,8 +1354,9 @@ class Main(QMainWindow):
         self.t1, self.t2 = TablasTab(), ParamTab(self.store)
         self.t3, self.t4 = CompTab(self.store), AtlasTab()
         self.tabs.addTab(self.t1, "Tablas de mortalidad"); self.tabs.addTab(self.t2, "Modelos paramétricos")
-        self.t5 = RentasTab()
-        self.tabs.addTab(self.t3, "Comparación"); self.tabs.addTab(self.t5, "Rentas actuariales"); self.tabs.addTab(self.t4, "Atlas")
+        self.t5, self.t6 = RentasTab(), SegurosTab()
+        self.tabs.addTab(self.t3, "Comparación"); self.tabs.addTab(self.t5, "Rentas actuariales")
+        self.tabs.addTab(self.t6, "Seguros de vida"); self.tabs.addTab(self.t4, "Atlas")
         self.tabs.currentChanged.connect(lambda i: i == 2 and self.t3.recompute())
         v.addWidget(self.tabs, 1)
         foot = QLabel("Fuente de las tablas: Resolución de la DGSFP de 17/12/2020 (BOE-A-2020-17154), anexos 1.1, 1.2, 1.3 y 2.1. "

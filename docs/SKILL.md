@@ -1,6 +1,6 @@
 ---
 name: "calculadora-supervivencia"
-description: Calcula y representa probabilidades actuariales de supervivencia y fallecimiento (ₙpₓ, ₙqₓ, ₘ|ₙqₓ, eₓ, ₜpₓ con edades no enteras) y la distribución, momentos y métricas de rentas actuariales (ₖ|ä⁽ᵐ⁾ₓ:ₙ⌉, ₖ|a⁽ᵐ⁾ₓ:ₙ⌉) a partir de las tablas PER2020 y PASEM2020 de la DGSFP o de leyes paramétricas de mortalidad (exponencial, De Moivre, Gompertz, Makeham, Weibull, Perks, Kannisto, Thiele, Siler, Heligman–Pollard), construyendo siempre la función lₓ. Úsala para crear, ampliar o revisar la calculadora profesional de Antonio (proyecto en Desktop\PROYECTOS\CALCULADORA CLAUDE: web React y escritorio Python), añadir tablas, modelos o productos, interpolar entre edades o representar supervivencia, distribución y hazard rate.
+description: Calcula y representa probabilidades actuariales de supervivencia y fallecimiento (ₙpₓ, ₙqₓ, ₘ|ₙqₓ, eₓ, ₜpₓ con edades no enteras) y la distribución, momentos y métricas de rentas actuariales (ₖ|ä⁽ᵐ⁾ₓ:ₙ⌉, ₖ|a⁽ᵐ⁾ₓ:ₙ⌉) y seguros de vida (temporal, vida entera, capital diferido, mixto, diferidos) a partir de las tablas PER2020 y PASEM2020 de la DGSFP o de leyes paramétricas de mortalidad (exponencial, De Moivre, Gompertz, Makeham, Weibull, Perks, Kannisto, Thiele, Siler, Heligman–Pollard), construyendo siempre la función lₓ. Úsala para crear, ampliar o revisar la calculadora profesional de Antonio (proyecto en Desktop\PROYECTOS\CALCULADORA CLAUDE: web React y escritorio Python), añadir tablas, modelos o productos, interpolar entre edades o representar supervivencia, distribución y hazard rate.
 ---
 
 # Calculadora actuarial de supervivencia
@@ -269,17 +269,42 @@ $a_{\overline{n-1/m}|}$.
   múltiplos de $1/m$; las edades $x+j/m$ usan interpolación lineal (UDD) fija.
 - Momentos de los órdenes que elija el usuario: $E[Y^s]=\sum \text{valor}^s\cdot\text{prob}$ (en €$^s$).
 - Métricas: media (prima pura única), varianza, $\sigma$, coeficiente de variación, asimetría y
-  curtosis (momentos centrales a partir de los ordinarios), cuantiles $Q(a)=\min\{y:F(y)\ge a\}$,
+  curtosis (momentos centrales **directos**, $\sum(y-E[Y])^r p$, no a partir de los ordinarios:
+  evita la cancelación en distribuciones concentradas), cuantiles $Q(a)=\min\{y:F(y)\ge a\}$,
   VaR 99,5 % y TVaR 99,5 % $=\frac{1}{1-a}\int_a^1 Q(u)\,du$.
 - Presentación: símbolo con $(m)$ y el subíndice apilados y el ángulo actuarial; en la tabla de
   la distribución, plazos en forma fraccionaria (`47+1/12`, no decimales).
 - Control: la suma de probabilidades es 1 y $E[Y]$ coincide con el cálculo pago a pago.
+- Interés por defecto: tipo técnico DGSFP del año (2026: 1,95 %, BOE-A-2026-1226), editable;
+  recargo de seguridad $\alpha\ge0$ libre con prima recargada $(1+\alpha)E[Y]$.
 
-### 12. Implementaciones
+### 12. Seguros de vida
+
+$x$, $n$ y $m$ enteros; capital de fallecimiento $C_f$ al final del año de fallecimiento; de
+supervivencia $C_s$ al vencimiento; $v(t)=(1+I)^{-t}$ (capa de descuento); $w=120$.
+Probabilidades de $l$: ${}_{t\mid}q_x=(l_{x+t}-l_{x+t+1})/l_x$.
+
+| Contrato | Valores de $Z$ |
+|---|---|
+| Temporal ${}_{m\mid}A^1_{x:\overline{n}|}$ | $C_f v^{m+i}$ con ${}_{m+i-1\mid}q_x$, $i=1\dots n$; $0$ con ${}_mq_x+{}_{m+n}p_x$ |
+| Vida entera ${}_{m\mid}A_x$ | igual con $n=w+1-x-m$; $0$ con ${}_mq_x$ si $m>0$ |
+| Capital diferido ${}_nE_x$ | $C_s v^n$ con ${}_np_x$; $0$ con ${}_nq_x$ (sin diferimiento) |
+| Mixto ${}_{m\mid}A_{x:\overline{n}|}$ | $0$ con ${}_mq_x$; $C_f v^{m+i}$ con ${}_{m+i-1\mid}q_x$; $C_s v^{m+n}$ con ${}_{m+n}p_x$ |
+
+- Dos capitales solo en el mixto; supervivencia del mixto diferido pagada en $m+n$.
+- Agrupar valores iguales y **ordenar por valor** antes de $F$, cuantiles, VaR y TVaR (los
+  valores de fallecimiento decrecen con el año).
+- Controles: conmutación ($D_y$, $C_y$, $M_y$), $A_x=1-d\,\ddot a_x$,
+  $A_{x:\overline n|}=1-d\,\ddot a_{x:\overline n|}$, ${}^2A$ al tipo $(1+I)^2-1$.
+- Antes de programar cualquier valoración nueva, presentar la base técnica a Antonio y
+  esperar su visto bueno.
+
+### 13. Implementaciones
 
 - **Artifact web**: React + recharts, un único HTML autocontenido (bundle con esbuild).
 - **Escritorio**: Python con PySide6 + matplotlib; motor separado de la interfaz
-  (`datos.py`, `tablas.py`, `modelos.py`, `rentas.py`) y .exe con PyInstaller (`calculadora.spec`).
+  (`datos.py`, `tablas.py`, `modelos.py`, `descuento.py`, `distribucion.py`, `rentas.py`,
+  `seguros.py`) y .exe con PyInstaller (`calculadora.spec`).
 - Ambos motores deben dar el mismo resultado (tolerancia $10^{-8}$): al cambiar uno,
   cambiar el otro y comparar.
 - **Tests:** `python tests/ejecutar_tests.py` (pytest + `node --test`, con prueba de
