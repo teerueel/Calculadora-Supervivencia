@@ -95,7 +95,7 @@ python app.py
 Para el ejecutable de Windows: `build_exe.bat`, que deja `dist\CalculadoraSupervivencia.exe`.
 
 Web: abrir `web/calculadora_supervivencia.html` en el navegador. Para recompilar desde el
-código fuente, `npm install && bash build.sh` dentro de `web/`.
+código fuente, `npm install && bash build.mjs` dentro de `web/`.
 
 ## Verificación de los datos
 
