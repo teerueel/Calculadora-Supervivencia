@@ -161,12 +161,79 @@ Cinco pestañas, en web y escritorio:
 Gráficas en las tres primeras: `_t p_x`, `_t q_x` y `\mu_{x+t}` (log/lineal), con marca en
 `t=n` y franja `[m,m+n]`.
 
+### 6\.1 Flujo de trabajo para cada cambio
+
+Toda nueva funcionalidad o corrección sigue estos pasos, en este orden:
+
+1. **Contexto**: leer este fichero, el `CHANGELOG.md` y, si aplica, los apuntes aportados
+   en `apuntes/`.
+2. **¿Está en la hoja de ruta?** Si Antonio pide algo que no está en §7, antes de
+   programar: proponer en qué capa (§7.1) y en qué fase encaja, o si va como mejora
+   suelta; avisar si depende de algo aún no hecho; y, con su visto bueno, **añadirlo a §7**
+   (fase, lista de espera o mejoras sueltas). La hoja de ruta siempre refleja lo acordado.
+3. **Plan breve**: qué se cambia, en qué capas y ficheros, qué fórmulas; si hay una
+   decisión de criterio actuarial, preguntar a Antonio antes de programar.
+4. **Implementar en ambos motores** (Python y JS) y en ambas interfaces.
+5. **Verificar**: tests (desde la fase 1), identidades de control, paridad Python/JS y
+   comprobación visual de la interfaz.
+6. **Documentar en el mismo commit**:
+   - `docs/NOTA_TECNICA.md`: toda fórmula, hipótesis, dato o magnitud nueva o cambiada;
+     subir versión y añadir línea en su historial (§11). **Obligatorio** si cambia algún
+     cálculo; una corrección solo de interfaz no lo requiere.
+   - `CHANGELOG.md`: entrada con fecha.
+   - Este fichero: §6 (estado), §7 (hoja de ruta) y §8 si procede de una asignatura.
+   - `README.md` si cambia lo que la calculadora calcula.
+7. **Compilar**: web (`web/`, copiar el HTML a `index.html`) y, si se pide, el `.exe`.
+8. **Commit** con mensaje descriptivo. **Push solo cuando Antonio lo pida.**
+
 ## 7\. Hoja de ruta
 
-Pendiente de definir con Antonio. Candidatos detectados al reorganizar (2026-10-07):
+Acordada el 2026-10-07. Criterio: **no ir por delante de lo que Antonio ha estudiado**;
+lo que aún no ha visto queda en la lista de espera. Se mantienen las dos plataformas en
+paridad: cada fase se cierra cuando funciona en ambas y pasa los tests.
 
-- Tests automáticos: paridad Python/JS, identidad de control, `verificacion_boe.py`.
-- Seguros de vida (capitales, primas) sobre el mismo motor de `l_x`.
+### 7\.1 Arquitectura objetivo del motor (cuatro capas)
+
+1. **Mortalidad → `l_x`**: tablas y modelos (existe).
+2. **Estado**: sobre qué se mide la supervivencia: `(x)`, vida conjunta (disolución con
+   la primera muerte) o último superviviente (extinción con la última). Cada estado da su
+   `_t p` a partir de las `l_x` individuales.
+3. **Producto**: qué se paga, cuándo y condicionado a qué (supervivencia o fallecimiento).
+   Rentas y seguros son productos; el mixto es la suma de dos.
+4. **Descuento**: función `v(t)`. Hoy `(1+I)^{-t}` con `I` constante.
+
+Cada contenido nuevo es una pieza en una capa, sin rehacer las demás.
+
+### 7\.2 Fases
+
+| Fase | Línea | Contenido |
+| --- | --- | --- |
+| 1 | **Base de calidad** | Tests automáticos (pytest y node): paridad Python/JS, identidad de control, suma de probabilidades = 1, `verificacion_boe.py` integrado. Script único. |
+| 2 | **Seguros sobre una cabeza** | Temporal a `n` años, vida entera, capital diferido, mixto (diferido + temporal) y seguro diferido de fallecimiento. Como en rentas: distribución completa de la v.a. del valor actual, momentos, prima pura única y métricas de riesgo. Se separan las capas de producto y descuento. Además: (a) gráfica de la **función de densidad de la vida residual** $f_{T(x)}(t) = {}_t p_x\,\mu_{x+t}$ junto a supervivencia, distribución y tanto instantáneo (pestañas de tablas, modelos y comparación), y funciones de masa y distribución también en seguros (en rentas ya existen); (b) preset del **tipo de interés técnico** del año (§7.3); (c) **recargo de seguridad** libre, en rentas y seguros: campo `α` (%) elegido por el usuario, prima recargada `(1+\alpha)\,E[Z]`, mostrando prima pura, importe del recargo y prima recargada. No se impone ningún principio de cálculo de primas. |
+| 3 | **Probabilidades de grupo** | Vida conjunta (disolución) y último superviviente (extinción) para dos o más cabezas, cada una con su tabla y sexo. Se crea la capa de estado. |
+| 4 | **Carteras y exportación** | Cargar una BBDD de asegurados, valorar en lote; exportar a Excel y PDF. |
+
+**Fase activa: 1.** Las decisiones de diseño de cada fase se anotan aquí al cerrarla.
+
+### 7\.3 Tipo de interés técnico
+
+Fuente: resolución anual de la DGSFP "por la que se publica el tipo de interés máximo a
+utilizar en el cálculo contable de la provisión de seguros de vida", en el BOE de enero,
+en aplicación del art. 33 del ROSSP (RD 2486/1998). **2026: 1,95 %**
+(Resolución de 9 de enero de 2026, BOE-A-2026-1226). La calculadora lo ofrecerá como valor
+por defecto, con año y referencia visibles y editable. Se actualiza cada enero.
+
+### 7\.4 Lista de espera (cuando se estudie)
+
+- Rentas y seguros sobre grupos (se apoyarán en las fases 2 y 3).
+- Primas periódicas, reservas matemáticas, curva de tipos EIOPA.
+
+### 7\.5 Mejoras sueltas
+
+Peticiones nuevas que no pertenecen a ninguna fase. Se añaden aquí al acordarlas y se
+tachan al implementarlas, con referencia a su entrada del `CHANGELOG.md`.
+
+*(ninguna todavía)*
 
 ## 8\. Incorporaciones desde asignaturas
 

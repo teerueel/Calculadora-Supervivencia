@@ -75,7 +75,7 @@ no enteras usan interpolación lineal (UDD). x es entera; n y k, múltiplos de 1
 ```
 python/   aplicación de escritorio (PySide6 + matplotlib) y generación del .exe
 web/      aplicación web (React + recharts) y el HTML autocontenido ya compilado
-docs/     SKILL.md (procedimiento de cálculo)
+docs/     NOTA_TECNICA.md (base técnica de los cálculos) y SKILL.md
 CLAUDE.md convenciones técnicas, decisiones y hoja de ruta
 CHANGELOG.md  historial de cambios
 ```
