@@ -195,7 +195,7 @@ Seis pestañas, en web y escritorio:
 4. **Rentas actuariales**: temporal o vitalicia, pre o postpagable, `m` pagos al año,
    diferimiento `k`, interés técnico `I` y recargo `α`; distribución, momentos, métricas de
    riesgo y prima pura, recargo y prima recargada (§2.1, §2.3).
-5. **Seguros de vida**: temporal, vida entera, capital diferido y mixto (dos capitales),
+5. **Seguros**: temporal, vida entera, capital diferido y mixto (dos capitales),
    diferidos salvo el capital diferido; mismos resultados que rentas más las partes de
    fallecimiento y supervivencia del mixto (§2.2).
 6. **Atlas**: guía de modelos paramétricos y de tablas e hipótesis de interpolación.
@@ -325,7 +325,7 @@ enero** (los dos ficheros y la nota técnica §10.2).
 Peticiones nuevas que no pertenecen a ninguna fase. Se añaden aquí al acordarlas y se
 tachan al implementarlas, con referencia a su entrada del `CHANGELOG.md`.
 
-*(ninguna todavía)*
+- ~~Renombrar la pestaña «Seguros de vida» a «Seguros»~~ (CHANGELOG, 2026-10-20).
 
 ## 8\. Incorporaciones desde asignaturas
 
@@ -334,6 +334,6 @@ anotar aquí: asignatura, qué se incorpora y qué decisiones propias se tomaron
 
 - **Seguros de Vida, apuntes 8–9** (`apuntes/seguros_de_vida/`), 2026-10-07: tipos de
   contrato (temporal, capital diferido, mixto, vida entera, diferidos) como v.a. del valor
-  actual, momentos y prima pura única. Implementados en la pestaña Seguros de vida.
+  actual, momentos y prima pura única. Implementados en la pestaña Seguros.
   Decisiones propias: dos capitales en el mixto, diferimiento también en el mixto, índice
   corregido en la fórmula del diferido (§7.2, fase 2).

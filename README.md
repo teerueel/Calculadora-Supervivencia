@@ -40,7 +40,7 @@ exponencial (fuerza de mortalidad constante), seleccionable.
    elegidos y, a partir de ellos, media (prima pura única), varianza, desviación típica,
    coeficiente de variación, asimetría, curtosis, cuantiles, VaR y TVaR al 99,5 %, y la prima
    pura, el importe del recargo de seguridad α y la prima recargada.
-5. **Seguros de vida** — temporal a n años, vida entera, capital diferido y mixto (con capital
+5. **Seguros** — temporal a n años, vida entera, capital diferido y mixto (con capital
    de fallecimiento y de supervivencia distintos), diferidos m años salvo el capital diferido.
    Mismos resultados que en rentas, con funciones de masa y de distribución del valor actual.
 6. **Atlas** — guía de los modelos paramétricos y de las tablas e hipótesis de interpolación.

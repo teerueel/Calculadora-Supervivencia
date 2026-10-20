@@ -1,4 +1,4 @@
-/* Pestaña «Seguros de vida». Controles comunes de App.jsx por props; piezas compartidas con
+/* Pestaña «Seguros». Controles comunes de App.jsx por props; piezas compartidas con
    rentas en comun.jsx; motor en seguros.js. */
 import React, { useMemo, useState } from "react";
 import { TABLES } from "./data.js";

@@ -1,7 +1,7 @@
 """
 Calculadora de supervivencia — aplicación de escritorio (PySide6 + matplotlib).
 
-Pestañas: Tablas de mortalidad · Modelos paramétricos · Comparación · Rentas actuariales · Seguros de vida · Atlas.
+Pestañas: Tablas de mortalidad · Modelos paramétricos · Comparación · Rentas actuariales · Seguros · Atlas.
 Ejecutar:            python app.py
 Generar el .exe:     build_exe.bat   (o pyinstaller calculadora.spec)
 """
@@ -1356,7 +1356,7 @@ class Main(QMainWindow):
         self.tabs.addTab(self.t1, "Tablas de mortalidad"); self.tabs.addTab(self.t2, "Modelos paramétricos")
         self.t5, self.t6 = RentasTab(), SegurosTab()
         self.tabs.addTab(self.t3, "Comparación"); self.tabs.addTab(self.t5, "Rentas actuariales")
-        self.tabs.addTab(self.t6, "Seguros de vida"); self.tabs.addTab(self.t4, "Atlas")
+        self.tabs.addTab(self.t6, "Seguros"); self.tabs.addTab(self.t4, "Atlas")
         self.tabs.currentChanged.connect(lambda i: i == 2 and self.t3.recompute())
         v.addWidget(self.tabs, 1)
         foot = QLabel("Fuente de las tablas: Resolución de la DGSFP de 17/12/2020 (BOE-A-2020-17154), anexos 1.1, 1.2, 1.3 y 2.1. "

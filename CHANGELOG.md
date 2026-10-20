@@ -2,6 +2,12 @@
 
 Entradas de la más reciente a la más antigua. Cada sesión de trabajo con cambios añade una.
 
+## 2026-10-20: Pestaña «Seguros»
+
+- La pestaña «Seguros de vida» pasa a llamarse **Seguros** en web y escritorio (petición de
+  Antonio). Solo cambia el rótulo: sin cambios de cálculo, la nota técnica no se toca.
+- HTML autocontenido, `index.html` y `.exe` recompilados.
+
 ## 2026-10-20: Cierre de la fase 2
 
 - La fase 2 (seguros sobre una cabeza) queda cerrada con lo hecho el 2026-10-07.

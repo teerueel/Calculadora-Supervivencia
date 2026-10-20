@@ -372,7 +372,7 @@ export default function App() {
           <p>Probabilidades de supervivencia y fallecimiento con las tablas PER2020 y PASEM2020 (BOE-A-2020-17154) y con leyes paramétricas de mortalidad.</p>
         </div>
         <nav className="tabs" role="tablist" aria-label="Secciones">
-          {[["tablas", "Tablas de mortalidad"], ["param", "Modelos paramétricos"], ["cmp", "Comparación"], ["rentas", "Rentas actuariales"], ["seguros", "Seguros de vida"], ["atlas", "Atlas"]].map(([k, lbl]) => (
+          {[["tablas", "Tablas de mortalidad"], ["param", "Modelos paramétricos"], ["cmp", "Comparación"], ["rentas", "Rentas actuariales"], ["seguros", "Seguros"], ["atlas", "Atlas"]].map(([k, lbl]) => (
             <button key={k} role="tab" type="button" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{lbl}</button>
           ))}
         </nav>
