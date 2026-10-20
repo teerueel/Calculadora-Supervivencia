@@ -264,17 +264,19 @@ Cada contenido nuevo es una pieza en una capa, sin rehacer las demás.
 | Fase | Línea | Contenido |
 | --- | --- | --- |
 | 1 | **Base de calidad** | Tests automáticos (pytest y node): paridad Python/JS, identidad de control, suma de probabilidades = 1, `verificacion_boe.py` integrado. Script único. |
-| 2 | **Seguros sobre una cabeza** | Temporal a `n` años, vida entera, capital diferido, mixto (diferido + temporal) y seguro diferido de fallecimiento. Como en rentas: distribución completa de la v.a. del valor actual, momentos, prima pura única y métricas de riesgo. Se separan las capas de producto y descuento. Además: (a) gráfica de la **función de densidad de la vida residual** $f_{T(x)}(t) = {}_t p_x\,\mu_{x+t}$ junto a supervivencia, distribución y tanto instantáneo (pestañas de tablas, modelos y comparación), y funciones de masa y distribución también en seguros (en rentas ya existen); (b) preset del **tipo de interés técnico** del año (§7.3); (c) **recargo de seguridad** libre, en rentas y seguros: campo `α` (%) elegido por el usuario, prima recargada `(1+\alpha)\,E[Z]`, mostrando prima pura, importe del recargo y prima recargada. No se impone ningún principio de cálculo de primas. |
+| 2 | **Seguros sobre una cabeza** | Temporal a `n` años, vida entera, capital diferido, mixto (diferido + temporal) y seguro diferido de fallecimiento. Como en rentas: distribución completa de la v.a. del valor actual, momentos, prima pura única y métricas de riesgo. Se separan las capas de producto y descuento. Además: (a) *(pasada a la lista de espera el 2026-10-20)* gráfica de la **función de densidad de la vida residual** $f_{T(x)}(t) = {}_t p_x\,\mu_{x+t}$ junto a supervivencia, distribución y tanto instantáneo (pestañas de tablas, modelos y comparación), y funciones de masa y distribución también en seguros (en rentas ya existen); (b) preset del **tipo de interés técnico** del año (§7.3); (c) **recargo de seguridad** libre, en rentas y seguros: campo `α` (%) elegido por el usuario, prima recargada `(1+\alpha)\,E[Z]`, mostrando prima pura, importe del recargo y prima recargada. No se impone ningún principio de cálculo de primas. |
 | 3 | **Probabilidades de grupo** | Vida conjunta (disolución) y último superviviente (extinción) para dos o más cabezas, cada una con su tabla y sexo. Se crea la capa de estado. |
 | 4 | **Carteras y exportación** | Cargar una BBDD de asegurados, valorar en lote; exportar a Excel y PDF. |
 
-**Fase activa: 2.** Las decisiones de diseño de cada fase se anotan aquí al cerrarla.
+**Fase activa: ninguna.** La fase 2 está cerrada; la 3 empieza cuando Antonio la pida.
+Las decisiones de diseño de cada fase se anotan aquí al cerrarla.
 
-**Fase 2, en curso.** Hecho el 2026-10-07: seguros sobre una cabeza (los cinco contratos,
-con distribución, momentos, métricas y funciones de masa y distribución), capas de producto
-y descuento separadas, tipo técnico por defecto (b) y recargo α en rentas y seguros (c).
-**Pendiente:** (a) la función de densidad de la vida residual, aplazada por Antonio el
-2026-10-07. Decisiones tomadas (base técnica verificada por Antonio el 2026-10-07):
+**Fase 2, cerrada el 2026-10-20.** Hecho el 2026-10-07: seguros sobre una cabeza (los cinco
+contratos, con distribución, momentos, métricas y funciones de masa y distribución), capas de
+producto y descuento separadas, tipo técnico por defecto (b) y recargo α en rentas y seguros (c).
+El punto (a), la función de densidad de la vida residual, **sale de la fase y pasa a la lista
+de espera** (§7.4): Antonio aún no lo ha estudiado (decisión del 2026-10-20).
+Decisiones tomadas (base técnica verificada por Antonio el 2026-10-07):
 
 - Mixto con **dos capitales** `C_f` y `C_s` (por defecto iguales); fuera del mixto, un único
   capital `C`.
@@ -313,6 +315,10 @@ enero** (los dos ficheros y la nota técnica §10.2).
 
 - Rentas y seguros sobre grupos (se apoyarán en las fases 2 y 3).
 - Primas periódicas, reservas matemáticas, curva de tipos EIOPA.
+- Función de densidad de la vida residual $f_{T(x)}(t) = {}_t p_x\,\mu_{x+t}$ en tablas,
+  modelos y comparación (sacada de la fase 2 el 2026-10-20). Base técnica ya esbozada:
+  escalonada `d_y/l_x` con UDD, `(l_y/l_x)\,p_y^s(-\ln p_y)` con la exponencial y
+  `S(x+t)\,\mu_{x+t}/S(x)` en modelos; pendiente de decidir el tramo [120, 121) y la escala.
 
 ### 7\.5 Mejoras sueltas
 

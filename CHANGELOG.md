@@ -2,6 +2,13 @@
 
 Entradas de la más reciente a la más antigua. Cada sesión de trabajo con cambios añade una.
 
+## 2026-10-20: Cierre de la fase 2
+
+- La fase 2 (seguros sobre una cabeza) queda cerrada con lo hecho el 2026-10-07.
+- La función de densidad de la vida residual sale de la fase 2 y pasa a la lista de espera
+  (`CLAUDE.md` §7.4), porque Antonio aún no la ha estudiado. Sin cambios de cálculo ni de
+  interfaz: no se toca la nota técnica ni se recompila.
+
 ## 2026-10-07: Fase 2 · Seguros de vida, interés técnico y recargo de seguridad
 
 - Nueva pestaña **Seguros de vida** (web y escritorio): temporal a n años, vida entera,
